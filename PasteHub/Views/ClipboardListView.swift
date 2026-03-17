@@ -89,6 +89,14 @@ struct ClipboardListView: View {
     private let horizontalScrollerGap: CGFloat = 8
     private let panelCornerRadius: CGFloat = 18
 
+    private var horizontalHistoryContentHeight: CGFloat {
+        horizontalCardHeight + horizontalScrollerGap + 8
+    }
+
+    private var horizontalSnippetContentHeight: CGFloat {
+        horizontalSnippetHeight + horizontalScrollerGap + 8
+    }
+
     private var minPanelHeight: CGFloat {
         useHorizontalWaterfall ? 260 : 560
     }
@@ -224,7 +232,7 @@ struct ClipboardListView: View {
         Group {
             if filteredItems.isEmpty {
                 EmptyStateCard()
-                    .frame(maxHeight: .infinity)
+                    .frame(maxHeight: useHorizontalWaterfall ? horizontalHistoryContentHeight : .infinity)
             } else if useHorizontalWaterfall {
                 horizontalWaterfallContent
             } else {
@@ -241,7 +249,7 @@ struct ClipboardListView: View {
                     title: "暂无常用片段",
                     subtitle: "可保存地址、账号、代码片段等，单击即可快速使用"
                 )
-                .frame(maxHeight: .infinity)
+                .frame(maxHeight: useHorizontalWaterfall ? horizontalSnippetContentHeight : .infinity)
             } else if useHorizontalWaterfall {
                 horizontalSnippetContent
             } else {
@@ -415,7 +423,7 @@ struct ClipboardListView: View {
             }
             .padding(.vertical, 2)
         }
-        .frame(maxHeight: horizontalCardHeight + horizontalScrollerGap + 8)
+        .frame(height: horizontalHistoryContentHeight)
     }
 
     private var verticalSnippetContent: some View {
@@ -453,7 +461,7 @@ struct ClipboardListView: View {
             }
             .padding(.vertical, 2)
         }
-        .frame(maxHeight: horizontalSnippetHeight + horizontalScrollerGap + 8)
+        .frame(height: horizontalSnippetContentHeight)
     }
 
     private func waterfallColumns(from items: [ClipboardItem]) -> [[ClipboardItem]] {

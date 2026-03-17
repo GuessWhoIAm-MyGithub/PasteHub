@@ -337,24 +337,22 @@ private struct AboutTab: View {
     private let email = "hfl1995@gmail.com"
     @State private var didCopyEmail = false
 
+    private var version: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
+    }
+
+    private var build: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "Unknown"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.accentColor.opacity(0.22), Color.accentColor.opacity(0.08)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                    Image(nsImage: NSApp.applicationIconImage)
+                        .resizable()
                         .frame(width: 52, height: 52)
-                        .overlay(
-                            Image(systemName: "doc.on.clipboard.fill")
-                                .font(.system(size: 24, weight: .semibold))
-                                .foregroundStyle(Color.accentColor)
-                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("PasteHub")
@@ -377,8 +375,45 @@ private struct AboutTab: View {
             )
 
             VStack(spacing: 10) {
+                AboutInfoRow(icon: "tag.fill", title: "版本", value: version)
+                AboutInfoRow(icon: "hammer.fill", title: "构建", value: build)
                 AboutInfoRow(icon: "person.fill", title: "作者", value: author)
-                AboutInfoRow(icon: "envelope.fill", title: "Email :", value: email)
+                HStack(spacing: 10) {
+                    Image(systemName: "envelope.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 18)
+                    Text("邮箱")
+                        .font(.system(size: 13, weight: .semibold))
+                    Spacer()
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(email, forType: .string)
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
+                            didCopyEmail = true
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                didCopyEmail = false
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            if didCopyEmail {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .transition(.scale.combined(with: .opacity))
+                            }
+                            Text(didCopyEmail ? "已复制" : email)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(didCopyEmail ? .green : .secondary)
+                    .scaleEffect(didCopyEmail ? 1.04 : 1.0)
+                    .animation(.spring(response: 0.28, dampingFraction: 0.72), value: didCopyEmail)
+                    .help("点击复制邮箱")
+                }
+                .padding(.horizontal, 4)
             }
             .padding(14)
             .background(
@@ -390,33 +425,9 @@ private struct AboutTab: View {
                     .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
             )
 
-            HStack(spacing: 10) {
-                Button(didCopyEmail ? "已复制邮箱" : "复制邮箱") {
-                    copyEmail()
-                }
-                .buttonStyle(.borderedProminent)
-
-                Button("发邮件") {
-                    guard let url = URL(string: "mailto:\(email)") else { return }
-                    NSWorkspace.shared.open(url)
-                }
-                .buttonStyle(.bordered)
-
-                Spacer()
-            }
-
             Spacer(minLength: 0)
         }
         .padding(18)
-    }
-
-    private func copyEmail() {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(email, forType: .string)
-        didCopyEmail = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-            didCopyEmail = false
-        }
     }
 }
 
