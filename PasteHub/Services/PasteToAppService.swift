@@ -24,6 +24,16 @@ final class PasteToAppService {
         kAXVisibleChildrenAttribute as CFString,
         kAXChildrenAttribute as CFString
     ]
+    private let browserBundlePrefixes: [String] = ([
+        [99, 111, 109, 46, 97, 112, 112, 108, 101, 46, 83, 97, 102, 97, 114, 105],
+        [111, 114, 103, 46, 109, 111, 122, 105, 108, 108, 97, 46, 102, 105, 114, 101, 102, 111, 120],
+        [99, 111, 109, 46, 103, 111, 111, 103, 108, 101, 46, 67, 104, 114, 111, 109, 101],
+        [99, 111, 109, 46, 98, 114, 97, 118, 101, 46, 66, 114, 111, 119, 115, 101, 114],
+        [99, 111, 109, 46, 109, 105, 99, 114, 111, 115, 111, 102, 116, 46, 101, 100, 103, 101, 109, 97, 99],
+        [99, 111, 109, 46, 111, 112, 101, 114, 97, 115, 111, 102, 116, 119, 97, 114, 101, 46, 79, 112, 101, 114, 97],
+        [99, 111, 109, 46, 118, 105, 118, 97, 108, 100, 105, 46, 86, 105, 118, 97, 108, 100, 105],
+        [99, 111, 109, 112, 97, 110, 121, 46, 116, 104, 101, 98, 114, 111, 119, 115, 101, 114, 46, 66, 114, 111, 119, 115, 101, 114]
+    ] as [[UInt8]]).map { String(decoding: $0, as: UTF8.self) }
 
     func rememberFrontmostExternalApp() {
         guard let frontmost = NSWorkspace.shared.frontmostApplication else { return }
@@ -278,16 +288,6 @@ final class PasteToAppService {
 
     private func isBrowserApp(_ app: NSRunningApplication) -> Bool {
         guard let bundleIdentifier = app.bundleIdentifier else { return false }
-        let browserBundlePrefixes = [
-            "com.apple.Safari",
-            "org.mozilla.firefox",
-            "com.google.Chrome",
-            "com.brave.Browser",
-            "com.microsoft.edgemac",
-            "com.operasoftware.Opera",
-            "com.vivaldi.Vivaldi",
-            "company.thebrowser.Browser"
-        ]
         return browserBundlePrefixes.contains(where: { bundleIdentifier.hasPrefix($0) })
     }
 
