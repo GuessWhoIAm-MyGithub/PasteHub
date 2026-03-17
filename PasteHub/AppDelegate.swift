@@ -158,7 +158,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let now = ProcessInfo.processInfo.systemUptime
-        if now - lastHotKeyTriggerTime < 0.25 {
+        if now - lastHotKeyTriggerTime < 0.4 {
             return
         }
         lastHotKeyTriggerTime = now

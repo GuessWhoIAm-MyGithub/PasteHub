@@ -78,7 +78,7 @@ final class FloatingPanel: NSPanel, NSWindowDelegate {
     }
 
     private var shouldHideOnToggle: Bool {
-        isPresented && isVisible
+        isVisible
     }
 
     private func show() {
