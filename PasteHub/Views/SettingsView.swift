@@ -13,6 +13,8 @@ struct SettingsView: View {
                 .tabItem { Label("快捷键", systemImage: "keyboard") }
             ExcludedAppsTab(settings: settings)
                 .tabItem { Label("排除应用", systemImage: "hand.raised.slash") }
+            AboutTab()
+                .tabItem { Label("关于", systemImage: "person.crop.circle.badge.checkmark") }
         }
         .frame(width: 480, height: 340)
     }
@@ -325,6 +327,122 @@ private struct ExcludedAppsTab: View {
             return Image(nsImage: icon)
         }
         return Image(systemName: "app")
+    }
+}
+
+// MARK: - About
+
+private struct AboutTab: View {
+    private let author = "FringHuang"
+    private let email = "hfl1995@gmail.com"
+    @State private var didCopyEmail = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 12) {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.accentColor.opacity(0.22), Color.accentColor.opacity(0.08)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 52, height: 52)
+                        .overlay(
+                            Image(systemName: "doc.on.clipboard.fill")
+                                .font(.system(size: 24, weight: .semibold))
+                                .foregroundStyle(Color.accentColor)
+                        )
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("PasteHub")
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                        Text("简洁高效的剪贴板助手")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.secondary.opacity(0.08))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.secondary.opacity(0.14), lineWidth: 1)
+            )
+
+            VStack(spacing: 10) {
+                AboutInfoRow(icon: "person.fill", title: "作者", value: author)
+                AboutInfoRow(icon: "envelope.fill", title: "Email :", value: email)
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.secondary.opacity(0.06))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+            )
+
+            HStack(spacing: 10) {
+                Button(didCopyEmail ? "已复制邮箱" : "复制邮箱") {
+                    copyEmail()
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button("发邮件") {
+                    guard let url = URL(string: "mailto:\(email)") else { return }
+                    NSWorkspace.shared.open(url)
+                }
+                .buttonStyle(.bordered)
+
+                Spacer()
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(18)
+    }
+
+    private func copyEmail() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(email, forType: .string)
+        didCopyEmail = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            didCopyEmail = false
+        }
+    }
+}
+
+private struct AboutInfoRow: View {
+    let icon: String
+    let title: String
+    let value: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 18)
+
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+
+            Spacer()
+
+            Text(value)
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+        }
+        .padding(.horizontal, 4)
     }
 }
 
