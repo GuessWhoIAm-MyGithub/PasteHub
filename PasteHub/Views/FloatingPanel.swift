@@ -4,6 +4,7 @@ import SwiftUI
 final class FloatingPanel: NSPanel, NSWindowDelegate {
     private let settings: SettingsManager
     private var isPresented = false
+    var onDidHide: (() -> Void)?
     private let topBottomPanelHeight: CGFloat = 320
     private let sidePanelWidth: CGFloat = 520
     private let travelDistance: CGFloat = 18
@@ -77,7 +78,7 @@ final class FloatingPanel: NSPanel, NSWindowDelegate {
     }
 
     private var shouldHideOnToggle: Bool {
-        isPresented && isVisible && NSApp.isActive && isKeyWindow
+        isPresented && isVisible
     }
 
     private func show() {
@@ -105,6 +106,7 @@ final class FloatingPanel: NSPanel, NSWindowDelegate {
         guard isVisible, let screen = targetScreenForCurrentFrame() else {
             level = .normal
             orderOut(nil)
+            onDidHide?()
             return
         }
         let frames = placementFrames(for: settings.panelEdge, on: screen)
@@ -113,6 +115,7 @@ final class FloatingPanel: NSPanel, NSWindowDelegate {
             guard let self else { return }
             self.level = .normal
             self.orderOut(nil)
+            self.onDidHide?()
         }
     }
 

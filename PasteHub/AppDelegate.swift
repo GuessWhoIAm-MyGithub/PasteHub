@@ -39,6 +39,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         teardownMonitors()
     }
 
+    func applicationDidResignActive(_ notification: Notification) {
+        panel?.close()
+        settingsWindow?.close()
+    }
+
     // MARK: - Status Item
 
     private func setupStatusItem() {
@@ -86,6 +91,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ),
             settings: settings
         )
+        panel.onDidHide = { [weak self] in
+            self?.settingsWindow?.close()
+        }
     }
 
     @objc func togglePanel() {
@@ -98,7 +106,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Settings
 
     @objc func showSettings() {
-        if let w = settingsWindow, w.isVisible {
+        if let w = settingsWindow {
+            w.level = panel.level
             w.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
@@ -114,6 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         w.contentViewController = NSHostingController(rootView: SettingsView(settings: settings))
         w.center()
         w.isReleasedWhenClosed = false
+        w.level = panel.level
         w.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow = w
