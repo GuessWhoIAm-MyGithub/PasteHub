@@ -182,12 +182,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         w.isMovableByWindowBackground = true
         w.contentViewController = NSHostingController(rootView: SettingsView(settings: settings))
         w.minSize = NSSize(width: 820, height: 560)
-        w.center()
         w.isReleasedWhenClosed = false
         w.level = panel.level
         w.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow = w
+        DispatchQueue.main.async { [weak self, weak w] in
+            guard let self, let w, self.settingsWindow === w else { return }
+            self.centerWindowOnActiveScreen(w)
+        }
     }
 
     @objc private func clearHistory() {
@@ -204,6 +207,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func quitApp() {
         NSApp.terminate(nil)
+    }
+
+    private func centerWindowOnActiveScreen(_ window: NSWindow) {
+        let targetScreen = NSScreen.main ?? NSScreen.screens.first
+
+        guard let screen = targetScreen else {
+            window.center()
+            return
+        }
+
+        let visibleFrame = screen.visibleFrame
+        let size = window.frame.size
+        let origin = NSPoint(
+            x: visibleFrame.minX + (visibleFrame.width - size.width) / 2,
+            y: visibleFrame.minY + (visibleFrame.height - size.height) / 2
+        )
+        window.setFrameOrigin(origin)
     }
 
     // MARK: - Global Hot Key

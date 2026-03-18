@@ -251,6 +251,7 @@ private struct SettingsCard<Content: View>: View {
 
             content
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -267,15 +268,18 @@ private struct SettingsCard<Content: View>: View {
 private struct SettingsRow<Accessory: View>: View {
     let title: String
     let subtitle: String?
+    let accessoryColumnWidth: CGFloat
     let accessory: Accessory
 
     init(
         title: String,
         subtitle: String? = nil,
+        accessoryColumnWidth: CGFloat = 220,
         @ViewBuilder accessory: () -> Accessory
     ) {
         self.title = title
         self.subtitle = subtitle
+        self.accessoryColumnWidth = accessoryColumnWidth
         self.accessory = accessory()
     }
 
@@ -295,6 +299,8 @@ private struct SettingsRow<Accessory: View>: View {
             Spacer(minLength: 12)
 
             accessory
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                .frame(width: accessoryColumnWidth, alignment: .trailing)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -362,7 +368,7 @@ private struct GeneralTab: View {
                     }
                     .pickerStyle(.menu)
                     .labelsHidden()
-                    .frame(width: 120)
+                    .frame(width: 120, alignment: .trailing)
                 }
             }
 
@@ -396,7 +402,7 @@ private struct GeneralTab: View {
                         }
                         .pickerStyle(.menu)
                         .labelsHidden()
-                        .frame(width: 110)
+                        .frame(width: 110, alignment: .trailing)
                         .disabled(settings.compactModeEnabled)
                     }
 
@@ -424,7 +430,7 @@ private struct GeneralTab: View {
                         }
                         .pickerStyle(.segmented)
                         .labelsHidden()
-                        .frame(width: 210)
+                        .frame(width: 210, alignment: .trailing)
                         .disabled(!settings.compactModeEnabled)
                     }
                 }
