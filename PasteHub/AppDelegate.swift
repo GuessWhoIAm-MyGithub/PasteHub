@@ -171,13 +171,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let w = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 460),
+            contentRect: NSRect(x: 0, y: 0, width: 880, height: 600),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: true
         )
         w.title = "PasteHub 设置"
+        w.titleVisibility = .hidden
+        w.titlebarAppearsTransparent = true
+        w.isMovableByWindowBackground = true
         w.contentViewController = NSHostingController(rootView: SettingsView(settings: settings))
+        w.minSize = NSSize(width: 820, height: 560)
         w.center()
         w.isReleasedWhenClosed = false
         w.level = panel.level

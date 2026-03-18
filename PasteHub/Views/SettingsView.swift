@@ -2,21 +2,339 @@ import SwiftUI
 import AppKit
 import ApplicationServices
 
+private enum SettingsSection: String, CaseIterable, Identifiable {
+    case general
+    case hotkey
+    case excludedApps
+    case about
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .general: return "通用"
+        case .hotkey: return "快捷键"
+        case .excludedApps: return "排除应用"
+        case .about: return "关于"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .general: return "gearshape"
+        case .hotkey: return "keyboard"
+        case .excludedApps: return "hand.raised.slash"
+        case .about: return "info.circle"
+        }
+    }
+}
+
 struct SettingsView: View {
     var settings: SettingsManager
+    @State private var selection: SettingsSection? = .general
 
     var body: some View {
-        TabView {
-            GeneralTab(settings: settings)
-                .tabItem { Label("通用", systemImage: "gear") }
-            HotkeyTab(settings: settings)
-                .tabItem { Label("快捷键", systemImage: "keyboard") }
-            ExcludedAppsTab(settings: settings)
-                .tabItem { Label("排除应用", systemImage: "hand.raised.slash") }
-            AboutTab()
-                .tabItem { Label("关于", systemImage: "person.crop.circle.badge.checkmark") }
+        ZStack {
+            Color(nsColor: .windowBackgroundColor)
+                .ignoresSafeArea()
+
+            HStack(spacing: 18) {
+                VStack(spacing: 0) {
+                    SettingsSidebarHeader()
+
+                    ScrollView {
+                        LazyVStack(spacing: 4) {
+                            ForEach(SettingsSection.allCases) { section in
+                                SettingsSidebarRow(
+                                    section: section,
+                                    isSelected: selection == section
+                                ) {
+                                    selection = section
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.bottom, 12)
+                    }
+                }
+                .frame(width: 220)
+                .frame(maxHeight: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(Color(nsColor: .underPageBackgroundColor))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
+                )
+
+                Group {
+                    if let selection {
+                        SettingsDetailView(section: selection, settings: settings)
+                    } else {
+                        ContentUnavailableView("选择设置项", systemImage: "sidebar.left")
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(nsColor: .windowBackgroundColor))
+            }
+            .padding(14)
         }
-        .frame(width: 480, height: 340)
+        .frame(minWidth: 880, minHeight: 600)
+    }
+}
+
+private struct SettingsSidebarRow: View {
+    let section: SettingsSection
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: section.systemImage)
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 18)
+
+                Text(section.title)
+                    .font(.system(size: 13, weight: .semibold))
+
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(isSelected ? .white : .primary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                isSelected ? Color.accentColor : Color.clear,
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct SettingsDetailView: View {
+    let section: SettingsSection
+    let settings: SettingsManager
+
+    @ViewBuilder
+    private var content: some View {
+        switch section {
+        case .general:
+            GeneralTab(settings: settings)
+        case .hotkey:
+            HotkeyTab(settings: settings)
+        case .excludedApps:
+            ExcludedAppsTab(settings: settings)
+        case .about:
+            AboutTab()
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            SettingsPageHeader(section: section)
+            Group {
+                content
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
+private struct SettingsSidebarHeader: View {
+    private var version: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 42, height: 42)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("PasteHub")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                Text("版本 \(version)")
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+        .padding(.bottom, 12)
+    }
+}
+
+private struct SettingsPageHeader: View {
+    let section: SettingsSection
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: section.systemImage)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 38, height: 38)
+                .background(
+                    Color.accentColor.opacity(0.12),
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(section.title)
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 28)
+        .padding(.top, 24)
+        .padding(.bottom, 10)
+    }
+}
+
+private struct SettingsPane<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                content
+            }
+            .frame(maxWidth: 720, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 28)
+            .padding(.top, 14)
+            .padding(.bottom, 24)
+        }
+        .scrollIndicators(.hidden)
+    }
+}
+
+private struct SettingsCard<Content: View>: View {
+    let title: String
+    let subtitle: String?
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        title = ""
+        subtitle = nil
+        self.content = content()
+    }
+
+    init(
+        title: String,
+        subtitle: String? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if !title.isEmpty {
+                Text(title)
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+            }
+
+            content
+        }
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct SettingsRow<Accessory: View>: View {
+    let title: String
+    let subtitle: String?
+    let accessory: Accessory
+
+    init(
+        title: String,
+        subtitle: String? = nil,
+        @ViewBuilder accessory: () -> Accessory
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.accessory = accessory()
+    }
+
+    var body: some View {
+        HStack(alignment: subtitle == nil ? .center : .top, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Spacer(minLength: 12)
+
+            accessory
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct SettingsMetricRow: View {
+    let title: String
+    let value: String
+    var allowsSelection: Bool = false
+
+    var body: some View {
+        HStack(spacing: 16) {
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+
+            Spacer(minLength: 12)
+
+            Group {
+                if allowsSelection {
+                    Text(value)
+                        .textSelection(.enabled)
+                } else {
+                    Text(value)
+                }
+            }
+            .font(.system(size: 12, weight: .medium, design: .monospaced))
+            .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct SettingsHint: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 12))
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
@@ -28,44 +346,90 @@ private struct GeneralTab: View {
     private let countOptions = [10, 20, 50, 100, 200, 500]
 
     var body: some View {
-        Form {
-            Section("历史记录") {
-                Picker("最大保留条数", selection: $settings.maxHistoryCount) {
-                    ForEach(countOptions, id: \.self) { n in
-                        Text("\(n) 条").tag(n)
+        SettingsPane {
+            SettingsCard(
+                title: "历史记录",
+                subtitle: "控制自动保留的剪贴板历史数量。"
+            ) {
+                SettingsRow(
+                    title: "最大保留条数",
+                    subtitle: "超过上限后，旧记录会自动按时间清理。"
+                ) {
+                    Picker("最大保留条数", selection: $settings.maxHistoryCount) {
+                        ForEach(countOptions, id: \.self) { count in
+                            Text("\(count) 条").tag(count)
+                        }
                     }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .frame(width: 120)
                 }
             }
-            Section("系统") {
-                Toggle("开机自动启动", isOn: $settings.launchAtLogin)
+
+            SettingsCard(
+                title: "系统",
+                subtitle: "管理 PasteHub 与系统的集成方式。"
+            ) {
+                SettingsRow(
+                    title: "开机自动启动",
+                    subtitle: "登录后自动在后台启动 PasteHub。"
+                ) {
+                    Toggle("", isOn: $settings.launchAtLogin)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
             }
-            Section("面板") {
-                Picker("弹出位置", selection: $settings.panelEdge) {
-                    ForEach(PanelEdge.allCases) { edge in
-                        Text(edge.title).tag(edge)
+
+            SettingsCard(
+                title: "面板",
+                subtitle: "控制主面板和精简面板的显示行为。"
+            ) {
+                VStack(alignment: .leading, spacing: 14) {
+                    SettingsRow(
+                        title: "默认弹出位置",
+                        subtitle: "仅对非精简模式生效。"
+                    ) {
+                        Picker("弹出位置", selection: $settings.panelEdge) {
+                            ForEach(PanelEdge.allCases) { edge in
+                                Text(edge.title).tag(edge)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .frame(width: 110)
+                        .disabled(settings.compactModeEnabled)
+                    }
+
+                    Divider()
+
+                    SettingsRow(
+                        title: "精简模式",
+                        subtitle: "点击状态栏图标时直接弹出紧凑面板。"
+                    ) {
+                        Toggle("", isOn: $settings.compactModeEnabled)
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                    }
+
+                    Divider()
+
+                    SettingsRow(
+                        title: "精简面板大小",
+                        subtitle: "小 / 中 / 大分别按屏幕高度的 45% / 60% / 75% 计算。"
+                    ) {
+                        Picker("精简面板大小", selection: $settings.compactPanelSize) {
+                            ForEach(CompactPanelSize.allCases) { size in
+                                Text(size.title).tag(size)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .frame(width: 210)
+                        .disabled(!settings.compactModeEnabled)
                     }
                 }
-                .disabled(settings.compactModeEnabled)
-
-                Toggle("精简模式", isOn: $settings.compactModeEnabled)
-
-                Picker("精简面板大小", selection: $settings.compactPanelSize) {
-                    ForEach(CompactPanelSize.allCases) { size in
-                        Text(size.title).tag(size)
-                    }
-                }
-                .disabled(!settings.compactModeEnabled)
-
-                Text("打开后，点击状态栏图标会直接弹出精简面板，并以线性列表展示历史记录。")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-
-                Text("小 / 中 / 大分别按屏幕高度的 45% / 60% / 75% 计算。")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
             }
         }
-        .formStyle(.grouped)
     }
 }
 
@@ -93,109 +457,105 @@ private struct HotkeyTab: View {
     }
 
     var body: some View {
-        Form {
-            Section("全局快捷键") {
-                HStack {
-                    Text("显示 / 隐藏面板")
-                    Spacer()
-                    HotkeyRecorderButton(
-                        displayString: settings.hotkeyDisplayString,
-                        onRecorded: { code, mods in
-                            settings.setHotkey(keyCode: code, modifiers: mods)
+        SettingsPane {
+            SettingsCard(
+                title: "全局快捷键",
+                subtitle: "录制新的组合键后即可立即生效。"
+            ) {
+                VStack(alignment: .leading, spacing: 14) {
+                    SettingsRow(
+                        title: "显示 / 隐藏面板",
+                        subtitle: "点击录制区域后直接按下新的快捷键组合，按 Esc 取消。"
+                    ) {
+                        HotkeyRecorderButton(
+                            displayString: settings.hotkeyDisplayString,
+                            onRecorded: { code, mods in
+                                settings.setHotkey(keyCode: code, modifiers: mods)
+                            }
+                        )
+                    }
+
+                    Divider()
+
+                    SettingsHint(text: "单击卡片会先复制内容，再尝试自动键入。首次授予辅助功能权限后建议重启 PasteHub。")
+                }
+            }
+
+            SettingsCard(
+                title: "内置快捷入口",
+                subtitle: "应用菜单和常用操作的固定触发方式。"
+            ) {
+                VStack(alignment: .leading, spacing: 12) {
+                    ShortcutRow(label: "打开设置", shortcut: "\u{2318},")
+                    ShortcutRow(label: "退出应用", shortcut: "\u{2318}Q")
+                    ShortcutRow(label: "完成键入条目", shortcut: "单击卡片")
+                    ShortcutRow(label: "重新复制 / 标签 / 删除", shortcut: "卡片按钮或右键菜单")
+                }
+            }
+
+            SettingsCard(
+                title: "辅助功能权限诊断",
+                subtitle: "若自动键入异常，可先检查当前运行实例和系统授权是否一致。"
+            ) {
+                VStack(alignment: .leading, spacing: 14) {
+                    SettingsRow(title: "辅助功能权限") {
+                        Text(isAccessibilityTrusted ? "已授权" : "未授权")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(isAccessibilityTrusted ? .green : .red)
+                    }
+
+                    Divider()
+
+                    SettingsMetricRow(title: "Bundle ID", value: bundleID, allowsSelection: true)
+                    SettingsMetricRow(title: "进程 PID", value: processID, allowsSelection: true)
+                    SettingsMetricRow(title: "上次检测", value: Self.timeFormatter.string(from: lastCheckedAt))
+
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("当前可执行路径")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(executablePath)
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("当前 Bundle 路径")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(bundlePath)
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Divider()
+
+                    HStack(spacing: 10) {
+                        Button("刷新状态") {
+                            refreshAccessibilityState()
                         }
-                    )
-                }
-            }
-            Section("菜单快捷键") {
-                ShortcutRow(label: "打开设置", shortcut: "\u{2318},")
-                ShortcutRow(label: "退出应用", shortcut: "\u{2318}Q")
-            }
-            Section("面板操作") {
-                ShortcutRow(label: "完成键入条目", shortcut: "单击卡片")
-                ShortcutRow(label: "重新复制 / 标签 / 删除", shortcut: "卡片按钮或右键菜单")
-            }
-            Section {
-                Text("点击全局快捷键区域后按下新的组合键即可修改，按 Esc 取消。单击卡片会先复制内容，再尝试自动键入。首次授予辅助功能权限后建议重启 PasteHub；若仍无效，请在系统设置中删除后重新添加 PasteHub 权限。")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            Section("键入权限诊断") {
-                HStack {
-                    Text("辅助功能权限")
-                    Spacer()
-                    Text(isAccessibilityTrusted ? "已授权" : "未授权")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(isAccessibilityTrusted ? .green : .red)
-                }
+                        .buttonStyle(.bordered)
 
-                HStack {
-                    Text("Bundle ID")
-                    Spacer()
-                    Text(bundleID)
-                        .font(.system(size: 12, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
+                        Button("打开辅助功能设置") {
+                            openAccessibilitySettings()
+                        }
+                        .buttonStyle(.borderedProminent)
 
-                HStack {
-                    Text("进程 PID")
-                    Spacer()
-                    Text(processID)
-                        .font(.system(size: 12, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("当前可执行路径")
-                    Text(executablePath)
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("当前 Bundle 路径")
-                    Text(bundlePath)
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                HStack {
-                    Text("上次检测")
-                    Spacer()
-                    Text(Self.timeFormatter.string(from: lastCheckedAt))
-                        .font(.system(size: 12, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                }
-
-                HStack(spacing: 10) {
-                    Button("刷新状态") {
-                        refreshAccessibilityState()
+                        Button("重置提示缓存") {
+                            PasteToAppService.resetAccessibilityPromptCache()
+                            refreshAccessibilityState()
+                        }
+                        .buttonStyle(.bordered)
                     }
-                    .buttonStyle(.bordered)
 
-                    Button("打开辅助功能设置") {
-                        openAccessibilitySettings()
-                    }
-                    .buttonStyle(.borderedProminent)
-
-                    Button("重置提示缓存") {
-                        PasteToAppService.resetAccessibilityPromptCache()
-                        refreshAccessibilityState()
-                    }
-                    .buttonStyle(.bordered)
+                    SettingsHint(text: "若路径与你在系统“辅助功能”里勾选的 PasteHub 不一致，会导致一直提示未授权。")
                 }
-
-                Text("若路径与你在系统“辅助功能”里勾选的 PasteHub 不一致，会导致一直提示未授权。")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
             }
         }
-        .formStyle(.grouped)
         .onAppear {
             refreshAccessibilityState()
         }
@@ -225,23 +585,25 @@ private struct ShortcutRow: View {
     let shortcut: String
 
     var body: some View {
-        HStack {
+        HStack(spacing: 16) {
             Text(label)
-            Spacer()
+                .font(.system(size: 13, weight: .semibold))
+            Spacer(minLength: 12)
             Text(shortcut)
-                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .font(.system(size: 12, weight: .medium, design: .rounded))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
                         .fill(Color.secondary.opacity(0.08))
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .stroke(Color.secondary.opacity(0.16), lineWidth: 1)
                 )
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -265,84 +627,93 @@ private struct ExcludedAppsTab: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if settings.excludedApps.isEmpty {
-                VStack(spacing: 10) {
-                    Image(systemName: "hand.raised.slash")
-                        .font(.system(size: 30, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Text("暂无排除应用")
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    Text("来自排除名单中应用的剪贴板内容将不会被记录")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List {
-                    ForEach(settings.excludedApps) { app in
-                        HStack(spacing: 10) {
-                            appIcon(for: app.bundleIdentifier)
-                                .resizable()
-                                .frame(width: 24, height: 24)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(app.name)
-                                    .font(.system(size: 13, weight: .medium))
-                                Text(app.bundleIdentifier)
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(.secondary)
+        SettingsPane {
+            SettingsCard(
+                title: "排除应用",
+                subtitle: "来自这些应用的剪贴板内容将不会被记录。"
+            ) {
+                VStack(alignment: .leading, spacing: 16) {
+                    if settings.excludedApps.isEmpty {
+                        VStack(spacing: 10) {
+                            Image(systemName: "hand.raised.slash")
+                                .font(.system(size: 30, weight: .medium))
+                                .foregroundStyle(.secondary)
+                            Text("暂无排除应用")
+                                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            Text("可从当前正在运行的应用里快速加入排除名单。")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 22)
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(Array(settings.excludedApps.enumerated()), id: \.element.id) { index, app in
+                                HStack(spacing: 12) {
+                                    appIcon(for: app.bundleIdentifier)
+                                        .resizable()
+                                        .frame(width: 28, height: 28)
+                                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(app.name)
+                                            .font(.system(size: 13, weight: .semibold))
+                                        Text(app.bundleIdentifier)
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(.secondary)
+                                    }
+
+                                    Spacer(minLength: 12)
+
+                                    Button(role: .destructive) {
+                                        settings.excludedApps.removeAll { $0.id == app.id }
+                                    } label: {
+                                        Image(systemName: "minus.circle.fill")
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(.vertical, 12)
+
+                                if index < settings.excludedApps.count - 1 {
+                                    Divider()
+                                }
                             }
-                            Spacer()
+                        }
+                    }
+
+                    Divider()
+
+                    Menu {
+                        ForEach(availableApps, id: \.bundleID) { app in
                             Button {
-                                settings.excludedApps.removeAll { $0.id == app.id }
+                                settings.excludedApps.append(
+                                    ExcludedApp(bundleIdentifier: app.bundleID, name: app.name)
+                                )
                             } label: {
-                                Image(systemName: "minus.circle.fill")
-                                    .foregroundStyle(.red.opacity(0.8))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        .padding(.vertical, 2)
-                    }
-                }
-            }
-
-            Divider()
-
-            HStack {
-                Menu {
-                    ForEach(availableApps, id: \.bundleID) { app in
-                        Button {
-                            settings.excludedApps.append(
-                                ExcludedApp(bundleIdentifier: app.bundleID, name: app.name)
-                            )
-                        } label: {
-                            Label {
-                                Text(app.name)
-                            } icon: {
-                                Image(nsImage: app.icon)
+                                Label {
+                                    Text(app.name)
+                                } icon: {
+                                    Image(nsImage: app.icon)
+                                }
                             }
                         }
-                    }
 
-                    if availableApps.isEmpty {
-                        Text("无可添加的运行中应用")
+                        if availableApps.isEmpty {
+                            Text("无可添加的运行中应用")
+                        }
+                    } label: {
+                        Label("添加正在运行的应用", systemImage: "plus")
                     }
-                } label: {
-                    Label("添加正在运行的应用", systemImage: "plus")
-                        .font(.system(size: 12, weight: .medium))
+                    .buttonStyle(.borderedProminent)
+                    .fixedSize()
                 }
-                .fixedSize()
-
-                Spacer()
             }
-            .padding(10)
         }
     }
 
     private func appIcon(for bundleID: String) -> Image {
         if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
-            let icon = NSWorkspace.shared.icon(forFile: url.path)
-            return Image(nsImage: icon)
+            return Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
         }
         return Image(systemName: "app")
     }
@@ -364,88 +735,72 @@ private struct AboutTab: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 12) {
+        SettingsPane {
+            SettingsCard {
+                HStack(spacing: 16) {
                     Image(nsImage: NSApp.applicationIconImage)
                         .resizable()
-                        .frame(width: 52, height: 52)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .frame(width: 58, height: 58)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text("PasteHub")
-                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .font(.system(size: 22, weight: .bold, design: .rounded))
                         Text("简洁高效的剪贴板助手")
-                            .font(.system(size: 12))
+                            .font(.system(size: 13))
                             .foregroundStyle(.secondary)
                     }
-                    Spacer()
+
+                    Spacer(minLength: 0)
                 }
             }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.secondary.opacity(0.08))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.secondary.opacity(0.14), lineWidth: 1)
-            )
 
-            VStack(spacing: 10) {
-                AboutInfoRow(icon: "tag.fill", title: "版本", value: version)
-                AboutInfoRow(icon: "hammer.fill", title: "构建", value: build)
-                AboutInfoRow(icon: "person.fill", title: "作者", value: author)
-                HStack(spacing: 10) {
-                    Image(systemName: "envelope.fill")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
-                        .frame(width: 18)
-                    Text("邮箱")
-                        .font(.system(size: 13, weight: .semibold))
-                    Spacer()
-                    Button {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(email, forType: .string)
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
-                            didCopyEmail = true
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                            withAnimation(.easeOut(duration: 0.2)) {
-                                didCopyEmail = false
+            SettingsCard(
+                title: "应用信息",
+                subtitle: "版本、构建号与维护者信息。"
+            ) {
+                VStack(spacing: 12) {
+                    AboutInfoRow(icon: "tag.fill", title: "版本", value: version)
+                    AboutInfoRow(icon: "hammer.fill", title: "构建", value: build)
+                    AboutInfoRow(icon: "person.fill", title: "作者", value: author)
+
+                    HStack(spacing: 10) {
+                        Image(systemName: "envelope.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.accentColor)
+                            .frame(width: 18)
+                        Text("邮箱")
+                            .font(.system(size: 13, weight: .semibold))
+                        Spacer()
+                        Button {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(email, forType: .string)
+                            withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
+                                didCopyEmail = true
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    didCopyEmail = false
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                if didCopyEmail {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .transition(.scale.combined(with: .opacity))
+                                }
+                                Text(didCopyEmail ? "已复制" : email)
                             }
                         }
-                    } label: {
-                        HStack(spacing: 4) {
-                            if didCopyEmail {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .transition(.scale.combined(with: .opacity))
-                            }
-                            Text(didCopyEmail ? "已复制" : email)
-                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(didCopyEmail ? .green : .secondary)
+                        .scaleEffect(didCopyEmail ? 1.04 : 1.0)
+                        .animation(.spring(response: 0.28, dampingFraction: 0.72), value: didCopyEmail)
                     }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(didCopyEmail ? .green : .secondary)
-                    .scaleEffect(didCopyEmail ? 1.04 : 1.0)
-                    .animation(.spring(response: 0.28, dampingFraction: 0.72), value: didCopyEmail)
-                    .help("点击复制邮箱")
                 }
-                .padding(.horizontal, 4)
             }
-            .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.secondary.opacity(0.06))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
-            )
-
-            Spacer(minLength: 0)
         }
-        .padding(18)
     }
 }
 
@@ -471,7 +826,6 @@ private struct AboutInfoRow: View {
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
         }
-        .padding(.horizontal, 4)
     }
 }
 
