@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var monitor: ClipboardMonitor!
     private var panel: FloatingPanel!
     private var statusItem: NSStatusItem!
+    private var statusMenu: NSMenu!
     private var hotKeyRef: EventHotKeyRef?
     private var hotKeyHandlerRef: EventHandlerRef?
     private var settingsWindow: NSWindow?
@@ -31,6 +32,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.reloadHotKey()
         }
         settings.onPanelEdgeChanged = { [weak self] in
+            self?.panel?.updatePlacementIfVisible()
+        }
+        settings.onCompactModeChanged = { [weak self] in
+            self?.configureStatusItemInteraction()
             self?.panel?.updatePlacementIfVisible()
         }
     }
@@ -72,7 +77,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem(title: "退出 PasteHub", action: #selector(quitApp), keyEquivalent: "q"))
 
-        statusItem.menu = menu
+        statusMenu = menu
+        configureStatusItemInteraction()
+    }
+
+    private func configureStatusItemInteraction() {
+        guard let button = statusItem.button else { return }
+
+        if settings.compactModeEnabled {
+            statusItem.menu = nil
+            button.target = self
+            button.action = #selector(handleStatusItemClick(_:))
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        } else {
+            button.sendAction(on: [])
+            button.action = nil
+            button.target = nil
+            statusItem.menu = statusMenu
+        }
+    }
+
+    @objc private func handleStatusItemClick(_ sender: NSStatusBarButton) {
+        guard let event = NSApp.currentEvent else {
+            togglePanel()
+            return
+        }
+
+        switch event.type {
+        case .rightMouseUp:
+            showStatusMenu(relativeTo: sender)
+        default:
+            togglePanel()
+        }
+    }
+
+    private func showStatusMenu(relativeTo _: NSStatusBarButton) {
+        guard let statusMenu else { return }
+        let previousMenu = statusItem.menu
+        let previousAction = statusItem.button?.action
+        let previousTarget = statusItem.button?.target
+
+        statusItem.button?.action = nil
+        statusItem.button?.target = nil
+        statusItem.menu = statusMenu
+        statusItem.button?.performClick(nil)
+        statusItem.menu = previousMenu
+        statusItem.button?.action = previousAction
+        statusItem.button?.target = previousTarget
     }
 
     // MARK: - Floating Panel
@@ -91,6 +142,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ),
             settings: settings
         )
+        panel.statusButtonProvider = { [weak self] in
+            self?.statusItem.button
+        }
         panel.onDidHide = { [weak self] in
             self?.settingsWindow?.close()
         }

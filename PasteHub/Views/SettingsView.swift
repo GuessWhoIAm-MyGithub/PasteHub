@@ -45,6 +45,13 @@ private struct GeneralTab: View {
                         Text(edge.title).tag(edge)
                     }
                 }
+                .disabled(settings.compactModeEnabled)
+
+                Toggle("精简模式", isOn: $settings.compactModeEnabled)
+
+                Text("打开后，点击状态栏图标会直接弹出精简面板，并以线性列表展示历史记录。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

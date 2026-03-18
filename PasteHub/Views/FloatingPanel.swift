@@ -5,8 +5,12 @@ final class FloatingPanel: NSPanel, NSWindowDelegate {
     private let settings: SettingsManager
     private var isPresented = false
     var onDidHide: (() -> Void)?
+    var statusButtonProvider: (() -> NSStatusBarButton?)?
     private let topBottomPanelHeight: CGFloat = 320
     private let sidePanelWidth: CGFloat = 520
+    private let compactPanelWidth: CGFloat = 380
+    private let compactPanelHeight: CGFloat = 480
+    private let compactPanelMargin: CGFloat = 10
     private let travelDistance: CGFloat = 18
     private let panelCornerRadius: CGFloat = 18
 
@@ -129,9 +133,25 @@ final class FloatingPanel: NSPanel, NSWindowDelegate {
     }
 
     private func placementFrames(for edge: PanelEdge, on screen: NSScreen) -> (shown: NSRect, hidden: NSRect) {
+        if settings.compactModeEnabled {
+            return compactPlacementFrames(on: screen)
+        }
+
         let visible = screen.visibleFrame
         let shown = shownFrame(for: edge, in: visible)
         let hidden = hiddenFrame(from: shown, edge: edge, visibleFrame: visible)
+        return (shown, hidden)
+    }
+
+    private func compactPlacementFrames(on screen: NSScreen) -> (shown: NSRect, hidden: NSRect) {
+        let visible = screen.visibleFrame
+        let shown = compactShownFrame(on: screen, visibleFrame: visible)
+        let hidden = NSRect(
+            x: shown.origin.x,
+            y: shown.origin.y + travelDistance,
+            width: shown.width,
+            height: shown.height
+        )
         return (shown, hidden)
     }
 
@@ -171,6 +191,22 @@ final class FloatingPanel: NSPanel, NSWindowDelegate {
         }
     }
 
+    private func compactShownFrame(on screen: NSScreen, visibleFrame: NSRect) -> NSRect {
+        let width = min(compactPanelWidth, visibleFrame.width - compactPanelMargin * 2)
+        let height = min(compactPanelHeight, visibleFrame.height - compactPanelMargin * 2)
+        let anchorFrame = statusButtonFrameOnScreen() ?? fallbackAnchorFrame(in: screen.frame)
+
+        let preferredX = anchorFrame.midX - width / 2
+        let maxX = visibleFrame.maxX - width - compactPanelMargin
+        let x = min(max(preferredX, visibleFrame.minX + compactPanelMargin), maxX)
+
+        let preferredY = anchorFrame.minY - height - compactPanelMargin
+        let maxY = visibleFrame.maxY - height - compactPanelMargin
+        let y = max(visibleFrame.minY + compactPanelMargin, min(preferredY, maxY))
+
+        return NSRect(x: x, y: y, width: width, height: height)
+    }
+
     private func hiddenFrame(from shownFrame: NSRect, edge: PanelEdge, visibleFrame: NSRect) -> NSRect {
         switch edge {
         case .bottom:
@@ -205,6 +241,10 @@ final class FloatingPanel: NSPanel, NSWindowDelegate {
     }
 
     private func targetScreenForShow() -> NSScreen? {
+        if settings.compactModeEnabled,
+           let buttonScreen = statusButtonProvider?()?.window?.screen {
+            return buttonScreen
+        }
         let mouseLocation = NSEvent.mouseLocation
         return NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) ?? NSScreen.main ?? NSScreen.screens.first
     }
@@ -221,5 +261,24 @@ final class FloatingPanel: NSPanel, NSWindowDelegate {
         contentView?.wantsLayer = true
         contentView?.layer?.cornerRadius = panelCornerRadius
         contentView?.layer?.masksToBounds = true
+    }
+
+    private func statusButtonFrameOnScreen() -> NSRect? {
+        guard let button = statusButtonProvider?(),
+              let window = button.window else {
+            return nil
+        }
+
+        let frameInWindow = button.convert(button.bounds, to: nil)
+        return window.convertToScreen(frameInWindow)
+    }
+
+    private func fallbackAnchorFrame(in screenFrame: NSRect) -> NSRect {
+        NSRect(
+            x: screenFrame.midX - 10,
+            y: screenFrame.maxY - 24,
+            width: 20,
+            height: 20
+        )
     }
 }

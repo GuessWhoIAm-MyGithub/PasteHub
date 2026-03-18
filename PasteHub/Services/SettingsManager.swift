@@ -63,8 +63,16 @@ final class SettingsManager {
         }
     }
 
+    var compactModeEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(compactModeEnabled, forKey: "compactModeEnabled")
+            onCompactModeChanged?()
+        }
+    }
+
     var onHotkeyChanged: (() -> Void)?
     var onPanelEdgeChanged: (() -> Void)?
+    var onCompactModeChanged: (() -> Void)?
 
     init() {
         let d = UserDefaults.standard
@@ -102,6 +110,8 @@ final class SettingsManager {
         } else {
             panelEdge = .bottom
         }
+
+        compactModeEnabled = d.bool(forKey: "compactModeEnabled")
     }
 
     func setHotkey(keyCode: UInt16, modifiers: UInt) {

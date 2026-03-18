@@ -67,8 +67,12 @@ struct ClipboardListView: View {
         self.onActivateItem = onActivateItem
     }
 
+    private var isCompactMode: Bool {
+        settings.compactModeEnabled
+    }
+
     private var useHorizontalWaterfall: Bool {
-        settings.panelEdge == .top || settings.panelEdge == .bottom
+        !isCompactMode && (settings.panelEdge == .top || settings.panelEdge == .bottom)
     }
 
     private var chromeMaxWidth: CGFloat {
@@ -89,6 +93,11 @@ struct ClipboardListView: View {
     private let horizontalSnippetHeight: CGFloat = 170
     private let horizontalScrollerGap: CGFloat = 8
     private let panelCornerRadius: CGFloat = 18
+    private let compactPanelWidth: CGFloat = 380
+    private let compactPanelHeight: CGFloat = 480
+    private let compactGridSpacing: CGFloat = 8
+    private let compactColumnWidth: CGFloat = 172
+    private let compactImageCardSize: CGFloat = 172
 
     private var horizontalHistoryContentHeight: CGFloat {
         horizontalCardHeight + horizontalScrollerGap + 8
@@ -148,18 +157,13 @@ struct ClipboardListView: View {
     }
 
     var body: some View {
-        ZStack {
-            panelBackground
-
-            VStack(spacing: contentSpacing) {
-                controlArea
-                contentArea
+        Group {
+            if isCompactMode {
+                compactModeBody
+            } else {
+                regularModeBody
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, verticalPadding)
         }
-        .frame(minWidth: 480, minHeight: minPanelHeight)
-        .clipShape(RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous))
         .sheet(item: $tagEditorItem) { item in
             TagEditorSheet(
                 initialTags: item.tags,
@@ -217,6 +221,49 @@ struct ClipboardListView: View {
                 self.selectedSnippetTag = nil
             }
         }
+        .onChange(of: settings.compactModeEnabled) { _, isEnabled in
+            if isEnabled {
+                isSnippetMode = false
+                selectedFilter = .all
+                selectedHistoryTag = nil
+                selectedSnippetTag = nil
+                isSearchExpanded = false
+            }
+        }
+    }
+
+    private var regularModeBody: some View {
+        ZStack {
+            panelBackground
+
+            VStack(spacing: contentSpacing) {
+                controlArea
+                contentArea
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, verticalPadding)
+        }
+        .frame(minWidth: 480, minHeight: minPanelHeight)
+        .clipShape(RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous))
+    }
+
+    private var compactModeBody: some View {
+        ZStack {
+            panelBackground
+
+            VStack(spacing: 12) {
+                compactHeader
+                compactHistoryList
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 14)
+        }
+        .frame(width: compactPanelWidth, height: compactPanelHeight)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            collapseSearchIfNeeded()
+        }
+        .clipShape(RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous))
     }
 
     private var panelBackground: some View {
@@ -224,6 +271,209 @@ struct ClipboardListView: View {
             .fill(.clear)
             .glassEffect(.regular, in: Rectangle())
             .ignoresSafeArea()
+    }
+
+    private var compactHeader: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 8) {
+                compactFilterRow
+                compactHeaderActions
+            }
+
+            compactTagFilterRow
+        }
+    }
+
+    private var compactFilterRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(ClipboardFilter.allCases) { filter in
+                    Button {
+                        selectedFilter = filter
+                    } label: {
+                        Text(filter.title)
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .foregroundStyle(selectedFilter == filter ? .white : .primary)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(
+                                selectedFilter == filter ? Color.accentColor : Color.secondary.opacity(0.12),
+                                in: Capsule()
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var compactHeaderActions: some View {
+        HStack(spacing: 8) {
+            compactSearchControl
+            if !(isSearchExpanded || !searchText.isEmpty) {
+                compactClearButton
+                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+                settingsButton
+                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+            }
+        }
+        .animation(.easeInOut(duration: 0.16), value: isSearchExpanded || !searchText.isEmpty)
+    }
+
+    private var compactHistoryList: some View {
+        Group {
+            if filteredItems.isEmpty {
+                EmptyStateCard(
+                    icon: "list.bullet.rectangle",
+                    title: "暂无记录",
+                    subtitle: queryText.isEmpty
+                        ? "复制文本、图片或文件后会按时间顺序出现在这里"
+                        : "没有匹配当前搜索条件的结果"
+                )
+            } else {
+                compactWaterfallContent
+            }
+        }
+    }
+
+    private var compactSearchControl: some View {
+        Group {
+            if isSearchExpanded || !searchText.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+
+                    TextField("搜索", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .focused($isSearchFocused)
+
+                    Button {
+                        if !searchText.isEmpty {
+                            searchText = ""
+                        } else {
+                            withAnimation(.easeInOut(duration: 0.14)) {
+                                isSearchExpanded = false
+                            }
+                            isSearchFocused = false
+                        }
+                    } label: {
+                        Image(systemName: searchText.isEmpty ? "chevron.left.circle.fill" : "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .frame(width: 142)
+                .background(
+                    Color(nsColor: .controlBackgroundColor).opacity(0.82),
+                    in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+                )
+            } else {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.14)) {
+                        isSearchExpanded = true
+                    }
+                    DispatchQueue.main.async {
+                        isSearchFocused = true
+                    }
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 30, height: 30)
+                        .background(
+                            Color(nsColor: .controlBackgroundColor).opacity(0.82),
+                            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .animation(.easeInOut(duration: 0.16), value: isSearchExpanded)
+    }
+
+    private var compactTagFilterRow: some View {
+        Group {
+            if availableHistoryTags.isEmpty {
+                EmptyView()
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        Button {
+                            selectedHistoryTag = nil
+                        } label: {
+                            Text("全部")
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .foregroundStyle(selectedHistoryTag == nil ? .white : .primary)
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 5)
+                                .background(
+                                    selectedHistoryTag == nil ? Color.accentColor : Color.secondary.opacity(0.12),
+                                    in: Capsule()
+                                )
+                        }
+                        .buttonStyle(.plain)
+
+                        ForEach(availableHistoryTags, id: \.self) { tag in
+                            Button {
+                                selectedHistoryTag = selectedHistoryTag == tag ? nil : tag
+                            } label: {
+                                Text("#\(tag)")
+                                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(selectedHistoryTag == tag ? .white : .primary)
+                                    .padding(.horizontal, 9)
+                                    .padding(.vertical, 5)
+                                    .background(
+                                        selectedHistoryTag == tag ? Color.accentColor : Color.secondary.opacity(0.12),
+                                        in: Capsule()
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 1)
+                }
+            }
+        }
+    }
+
+    private var compactWaterfallContent: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            let columns = compactWaterfallColumns(from: filteredItems)
+            HStack(alignment: .top, spacing: compactGridSpacing) {
+                ForEach(0..<2, id: \.self) { col in
+                    LazyVStack(spacing: compactGridSpacing) {
+                        ForEach(columns[col]) { item in
+                            CompactClipboardCard(
+                                item: item,
+                                cardWidth: compactColumnWidth,
+                                imageCardSize: compactImageCardSize,
+                                onPrimaryAction: { activateClipboardItem(item) },
+                                onCopy: { store.copyToClipboard(item) },
+                                onDelete: { store.remove(item) },
+                                onManageTags: { tagEditorItem = item },
+                                onSaveAsSnippet: { quickSaveAsSnippet(item) },
+                                onTokenSelect: { tokenSelectionItem = item }
+                            )
+                        }
+                    }
+                    .frame(width: compactColumnWidth, alignment: .top)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 2)
+        }
     }
 
     private var contentArea: some View {
@@ -484,6 +734,19 @@ struct ClipboardListView: View {
         return columns
     }
 
+    private func compactWaterfallColumns(from items: [ClipboardItem]) -> [[ClipboardItem]] {
+        var columns: [[ClipboardItem]] = [[], []]
+        var heights: [CGFloat] = [0, 0]
+
+        for item in items {
+            let column = heights[0] <= heights[1] ? 0 : 1
+            columns[column].append(item)
+            heights[column] += compactEstimatedHeight(for: item)
+        }
+
+        return columns
+    }
+
     private func estimatedHeight(for item: ClipboardItem) -> CGFloat {
         switch item.type {
         case .image: return 200
@@ -493,6 +756,20 @@ struct ClipboardListView: View {
             if len > 100 { return 150 }
             if len > 40 { return 120 }
             return 90
+        }
+    }
+
+    private func compactEstimatedHeight(for item: ClipboardItem) -> CGFloat {
+        switch item.type {
+        case .image:
+            return compactImageCardSize
+        case .file:
+            return 110
+        case .text:
+            let len = item.displayText.count
+            if len > 120 { return 160 }
+            if len > 60 { return 136 }
+            return 112
         }
     }
 
@@ -620,6 +897,26 @@ struct ClipboardListView: View {
         .controlSize(.small)
     }
 
+    private var compactClearButton: some View {
+        Button {
+            isClearConfirmationPresented = true
+        } label: {
+            Image(systemName: "trash")
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .help("清空历史")
+        .disabled(store.items.isEmpty)
+    }
+
+    private func collapseSearchIfNeeded() {
+        guard isSearchExpanded, searchText.isEmpty else { return }
+        withAnimation(.easeInOut(duration: 0.14)) {
+            isSearchExpanded = false
+        }
+        isSearchFocused = false
+    }
+
     private func beginAddSnippet() {
         editingSnippet = nil
         isSnippetEditorPresented = true
@@ -683,6 +980,234 @@ struct ClipboardListView: View {
         .buttonStyle(.bordered)
         .controlSize(.small)
         .help("打开设置")
+    }
+}
+
+private struct CompactClipboardCard: View {
+    let item: ClipboardItem
+    let cardWidth: CGFloat
+    let imageCardSize: CGFloat
+    let onPrimaryAction: () -> Void
+    let onCopy: () -> Void
+    let onDelete: () -> Void
+    let onManageTags: () -> Void
+    let onSaveAsSnippet: () -> Void
+    let onTokenSelect: () -> Void
+    @State private var isHovering = false
+
+    private var accent: Color {
+        switch item.type {
+        case .text: return Color(red: 0.20, green: 0.78, blue: 0.76)
+        case .image: return Color(red: 0.34, green: 0.68, blue: 1.00)
+        case .file: return Color(red: 0.96, green: 0.69, blue: 0.26)
+        }
+    }
+
+    private var previewImage: NSImage? {
+        guard item.type == .image, let url = item.contentURL else { return nil }
+        let key = url as NSURL
+        if let cached = ImagePreviewCache.shared.object(forKey: key) {
+            return cached
+        }
+        guard let image = NSImage(contentsOf: url) else { return nil }
+        ImagePreviewCache.shared.setObject(image, forKey: key)
+        return image
+    }
+
+    private var sourceAppIcon: NSImage? {
+        guard let appName = item.sourceApp, !appName.isEmpty else { return nil }
+        let key = appName as NSString
+        if let cached = AppIconCache.shared.object(forKey: key) {
+            return cached
+        }
+
+        if let bundleID = item.sourceBundleIdentifier,
+           let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+            let icon = NSWorkspace.shared.icon(forFile: appURL.path)
+            icon.size = NSSize(width: 14, height: 14)
+            AppIconCache.shared.setObject(icon, forKey: key)
+            return icon
+        }
+
+        if let runningIcon = NSWorkspace.shared.runningApplications.first(where: { app in
+            app.localizedName == appName
+        })?.icon {
+            runningIcon.size = NSSize(width: 14, height: 14)
+            AppIconCache.shared.setObject(runningIcon, forKey: key)
+            return runningIcon
+        }
+
+        return nil
+    }
+
+    private var isImageCard: Bool {
+        item.type == .image
+    }
+
+    var body: some View {
+        Group {
+            if isImageCard {
+                imageCardBody
+            } else {
+                regularCardBody
+            }
+        }
+        .contextMenu {
+            Button("完成键入", action: onPrimaryAction)
+            Button("重新复制", action: onCopy)
+            Button("编辑标签", action: onManageTags)
+            if item.type == .text {
+                Button("分词选择", action: onTokenSelect)
+                Button("添加到常用片段", action: onSaveAsSnippet)
+            }
+            Divider()
+            Button("删除", role: .destructive, action: onDelete)
+        }
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.12)) {
+                isHovering = hovering
+            }
+        }
+    }
+
+    private var imageCardBody: some View {
+        Button(action: onPrimaryAction) {
+            ZStack(alignment: .topLeading) {
+                imageCardBackground
+
+                compactMetaRow(foreground: .white.opacity(0.96), secondary: .white.opacity(0.78))
+                    .padding(.horizontal, 10)
+                    .padding(.top, 9)
+                    .shadow(color: .black.opacity(0.18), radius: 8, x: 0, y: 2)
+
+                VStack(spacing: 0) {
+                    Spacer()
+
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.58)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 54)
+                    .overlay(alignment: .bottomLeading) {
+                        compactFooterRow(foreground: .white.opacity(0.92))
+                        .padding(.horizontal, 10)
+                        .padding(.bottom, 8)
+                    }
+                }
+            }
+            .frame(width: cardWidth, height: imageCardSize)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor).opacity(isHovering ? 0.86 : 0.72))
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var imageCardBackground: some View {
+        if let previewImage {
+            Image(nsImage: previewImage)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fill)
+                .frame(width: cardWidth, height: imageCardSize)
+                .clipped()
+        } else {
+            Rectangle()
+                .fill(accent.opacity(0.18))
+                .overlay {
+                    Image(systemName: item.type.icon)
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(accent)
+                }
+        }
+    }
+
+    private var regularCardBody: some View {
+        Button(action: onPrimaryAction) {
+            VStack(alignment: .leading, spacing: 8) {
+                compactMetaRow(foreground: accent, secondary: .secondary)
+
+                Text(item.displayText)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(item.type == .text ? 5 : 3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                compactFooterRow(foreground: .secondary)
+
+                if isHovering {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        Text("单击回填，右键更多")
+                            .lineLimit(1)
+                    }
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
+            }
+            .padding(10)
+            .frame(width: cardWidth, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor).opacity(isHovering ? 0.86 : 0.72))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func compactMetaRow(foreground: Color, secondary: Color) -> some View {
+        HStack(spacing: 4) {
+            Text(item.type.label)
+                .foregroundStyle(foreground)
+            Text("·")
+                .foregroundStyle(secondary)
+            Text(ClipboardTimeFormatter.shared.string(from: item.timestamp))
+                .foregroundStyle(secondary)
+            Spacer(minLength: 0)
+        }
+        .font(.system(size: 10, weight: .semibold, design: .rounded))
+        .lineLimit(1)
+    }
+
+    private func compactFooterRow(foreground: Color) -> some View {
+        HStack(spacing: 6) {
+            if let app = item.sourceApp, !app.isEmpty {
+                HStack(spacing: 4) {
+                    if let sourceAppIcon {
+                        Image(nsImage: sourceAppIcon)
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: 12, height: 12)
+                            .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                    }
+                    Text(app)
+                        .lineLimit(1)
+                }
+            }
+
+            if !item.tags.isEmpty {
+                Text(item.tags.prefix(1).map { "#\($0)" }.joined())
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .font(.system(size: 10, weight: .medium, design: .rounded))
+        .foregroundStyle(foreground)
     }
 }
 
