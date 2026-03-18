@@ -97,6 +97,7 @@ struct ClipboardListView: View {
     private let compactGridSpacing: CGFloat = 8
     private let compactColumnWidth: CGFloat = 172
     private let compactImageCardSize: CGFloat = 172
+    private var compactSnippetCardWidth: CGFloat { compactPanelWidth - 28 }
 
     private var horizontalHistoryContentHeight: CGFloat {
         horizontalCardHeight + horizontalScrollerGap + 8
@@ -253,7 +254,7 @@ struct ClipboardListView: View {
 
                 VStack(spacing: 12) {
                     compactHeader
-                    compactHistoryList
+                    compactContentArea
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 14)
@@ -278,36 +279,51 @@ struct ClipboardListView: View {
     private var compactHeader: some View {
         VStack(spacing: 10) {
             HStack(spacing: 8) {
-                compactFilterRow
+                compactModeTabs
                 compactHeaderActions
+            }
+
+            if !isSnippetMode {
+                compactHistoryFilterRow
             }
 
             compactTagFilterRow
         }
     }
 
-    private var compactFilterRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(ClipboardFilter.allCases) { filter in
-                    Button {
-                        selectedFilter = filter
-                    } label: {
-                        Text(filter.title)
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundStyle(selectedFilter == filter ? .white : .primary)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 5)
-                            .background(
-                                selectedFilter == filter ? Color.accentColor : Color.secondary.opacity(0.12),
-                                in: Capsule()
-                            )
-                    }
-                    .buttonStyle(.plain)
+    private var compactModeTabs: some View {
+        HStack(spacing: 6) {
+            compactModeTab(
+                title: "历史",
+                systemImage: "clock.arrow.circlepath",
+                count: store.items.count,
+                isActive: !isSnippetMode
+            ) {
+                withAnimation(.easeInOut(duration: 0.16)) {
+                    isSnippetMode = false
                 }
             }
-            .padding(.vertical, 1)
+
+            compactModeTab(
+                title: "常用片段",
+                systemImage: "bookmark.fill",
+                count: store.snippets.count,
+                isActive: isSnippetMode
+            ) {
+                withAnimation(.easeInOut(duration: 0.16)) {
+                    isSnippetMode = true
+                }
+            }
         }
+        .padding(4)
+        .background(
+            Color(nsColor: .controlBackgroundColor).opacity(0.82),
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+        )
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -315,13 +331,29 @@ struct ClipboardListView: View {
         HStack(spacing: 8) {
             compactSearchControl
             if !(isSearchExpanded || !searchText.isEmpty) {
-                compactClearButton
-                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+                if isSnippetMode {
+                    compactSnippetAddButton
+                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+                } else {
+                    compactClearButton
+                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+                }
                 settingsButton
                     .transition(.opacity.combined(with: .move(edge: .trailing)))
             }
         }
         .animation(.easeInOut(duration: 0.16), value: isSearchExpanded || !searchText.isEmpty)
+    }
+
+    private var compactContentArea: some View {
+        Group {
+            if isSnippetMode {
+                compactSnippetList
+            } else {
+                compactHistoryList
+            }
+        }
+        .animation(.easeInOut(duration: 0.16), value: isSnippetMode ? filteredSnippets.count : filteredItems.count)
     }
 
     private var compactHistoryList: some View {
@@ -336,6 +368,22 @@ struct ClipboardListView: View {
                 )
             } else {
                 compactWaterfallContent
+            }
+        }
+    }
+
+    private var compactSnippetList: some View {
+        Group {
+            if filteredSnippets.isEmpty {
+                EmptyStateCard(
+                    icon: "bookmark",
+                    title: "暂无常用片段",
+                    subtitle: queryText.isEmpty
+                        ? "可保存地址、账号、代码片段等，单击即可快速使用"
+                        : "没有匹配当前搜索条件的片段"
+                )
+            } else {
+                compactSnippetContent
             }
         }
     }
@@ -405,39 +453,72 @@ struct ClipboardListView: View {
         .animation(.easeInOut(duration: 0.16), value: isSearchExpanded)
     }
 
+    private var compactHistoryFilterRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(ClipboardFilter.allCases) { filter in
+                    Button {
+                        selectedFilter = filter
+                    } label: {
+                        Text(filter.title)
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .foregroundStyle(selectedFilter == filter ? .white : .primary)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(
+                                selectedFilter == filter ? Color.accentColor : Color.secondary.opacity(0.12),
+                                in: Capsule()
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private var compactTagFilterRow: some View {
         Group {
-            if availableHistoryTags.isEmpty {
+            if availableTags.isEmpty {
                 EmptyView()
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         Button {
-                            selectedHistoryTag = nil
+                            if isSnippetMode {
+                                selectedSnippetTag = nil
+                            } else {
+                                selectedHistoryTag = nil
+                            }
                         } label: {
                             Text("全部")
                                 .font(.system(size: 10, weight: .semibold, design: .rounded))
-                                .foregroundStyle(selectedHistoryTag == nil ? .white : .primary)
+                                .foregroundStyle(compactSelectedTag == nil ? .white : .primary)
                                 .padding(.horizontal, 9)
                                 .padding(.vertical, 5)
                                 .background(
-                                    selectedHistoryTag == nil ? Color.accentColor : Color.secondary.opacity(0.12),
+                                    compactSelectedTag == nil ? Color.accentColor : Color.secondary.opacity(0.12),
                                     in: Capsule()
                                 )
                         }
                         .buttonStyle(.plain)
 
-                        ForEach(availableHistoryTags, id: \.self) { tag in
+                        ForEach(availableTags, id: \.self) { tag in
                             Button {
-                                selectedHistoryTag = selectedHistoryTag == tag ? nil : tag
+                                if isSnippetMode {
+                                    selectedSnippetTag = selectedSnippetTag == tag ? nil : tag
+                                } else {
+                                    selectedHistoryTag = selectedHistoryTag == tag ? nil : tag
+                                }
                             } label: {
                                 Text("#\(tag)")
                                     .font(.system(size: 10, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(selectedHistoryTag == tag ? .white : .primary)
+                                    .foregroundStyle(compactSelectedTag == tag ? .white : .primary)
                                     .padding(.horizontal, 9)
                                     .padding(.vertical, 5)
                                     .background(
-                                        selectedHistoryTag == tag ? Color.accentColor : Color.secondary.opacity(0.12),
+                                        compactSelectedTag == tag ? Color.accentColor : Color.secondary.opacity(0.12),
                                         in: Capsule()
                                     )
                             }
@@ -448,6 +529,10 @@ struct ClipboardListView: View {
                 }
             }
         }
+    }
+
+    private var compactSelectedTag: String? {
+        isSnippetMode ? selectedSnippetTag : selectedHistoryTag
     }
 
     private var compactWaterfallContent: some View {
@@ -474,6 +559,26 @@ struct ClipboardListView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 2)
+        }
+    }
+
+    private var compactSnippetContent: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            LazyVStack(spacing: compactGridSpacing) {
+                ForEach(filteredSnippets) { snippet in
+                    SnippetCard(
+                        snippet: snippet,
+                        onPrimaryAction: { activateSnippet(snippet) },
+                        onCopy: { store.copySnippetToClipboard(snippet) },
+                        onEdit: { beginEditSnippet(snippet) },
+                        onDelete: { store.removeSnippet(snippet) },
+                        preferredWidth: compactSnippetCardWidth,
+                        compactStyle: true
+                    )
+                }
+            }
+            .frame(maxWidth: .infinity)
             .padding(.vertical, 2)
         }
     }
@@ -909,6 +1014,54 @@ struct ClipboardListView: View {
         .controlSize(.small)
         .help("清空历史")
         .disabled(store.items.isEmpty)
+    }
+
+    private var compactSnippetAddButton: some View {
+        Button {
+            beginAddSnippet()
+        } label: {
+            Image(systemName: "plus")
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .help("新增常用片段")
+    }
+
+    private func compactModeTab(
+        title: String,
+        systemImage: String,
+        count: Int,
+        isActive: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 11, weight: .semibold))
+
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+
+                Text("\(count)")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        isActive ? Color.white.opacity(0.18) : Color.secondary.opacity(0.12),
+                        in: Capsule()
+                    )
+            }
+            .foregroundStyle(isActive ? .white : .primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
+            .background(
+                isActive ? Color.accentColor : Color.clear,
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private func collapseSearchIfNeeded() {
