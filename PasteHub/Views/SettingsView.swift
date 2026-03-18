@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 import ApplicationServices
 
-private enum SettingsSection: String, CaseIterable, Identifiable {
+private enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
     case general
     case hotkey
     case excludedApps
@@ -34,84 +34,27 @@ struct SettingsView: View {
     @State private var selection: SettingsSection? = .general
 
     var body: some View {
-        ZStack {
-            Color(nsColor: .windowBackgroundColor)
-                .ignoresSafeArea()
-
-            HStack(spacing: 18) {
-                VStack(spacing: 0) {
-                    SettingsSidebarHeader()
-
-                    ScrollView {
-                        LazyVStack(spacing: 4) {
-                            ForEach(SettingsSection.allCases) { section in
-                                SettingsSidebarRow(
-                                    section: section,
-                                    isSelected: selection == section
-                                ) {
-                                    selection = section
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.bottom, 12)
-                    }
+        NavigationSplitView {
+            List(SettingsSection.allCases, selection: $selection) { section in
+                NavigationLink(value: section) {
+                    Label(section.title, systemImage: section.systemImage)
                 }
-                .frame(width: 220)
-                .frame(maxHeight: .infinity)
-                .background(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(Color(nsColor: .underPageBackgroundColor))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(Color.secondary.opacity(0.08), lineWidth: 1)
-                )
-
-                Group {
-                    if let selection {
-                        SettingsDetailView(section: selection, settings: settings)
-                    } else {
-                        ContentUnavailableView("选择设置项", systemImage: "sidebar.left")
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(nsColor: .windowBackgroundColor))
             }
-            .padding(14)
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 240, ideal: 260, max: 280)
+        } detail: {
+            Group {
+                if let selection {
+                    SettingsDetailView(section: selection, settings: settings)
+                } else {
+                    ContentUnavailableView("选择设置项", systemImage: "sidebar.left")
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(nsColor: .windowBackgroundColor))
         }
+        .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 880, minHeight: 600)
-    }
-}
-
-private struct SettingsSidebarRow: View {
-    let section: SettingsSection
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: section.systemImage)
-                    .font(.system(size: 14, weight: .semibold))
-                    .frame(width: 18)
-
-                Text(section.title)
-                    .font(.system(size: 13, weight: .semibold))
-
-                Spacer(minLength: 0)
-            }
-            .foregroundStyle(isSelected ? .white : .primary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                isSelected ? Color.accentColor : Color.clear,
-                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 }
 
@@ -136,39 +79,10 @@ private struct SettingsDetailView: View {
     var body: some View {
         VStack(spacing: 0) {
             SettingsPageHeader(section: section)
-            Group {
-                content
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-    }
-}
-
-private struct SettingsSidebarHeader: View {
-    private var version: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
-    }
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .frame(width: 42, height: 42)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("PasteHub")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                Text("版本 \(version)")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 16)
-        .padding(.bottom, 12)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 }
 
@@ -176,26 +90,14 @@ private struct SettingsPageHeader: View {
     let section: SettingsSection
 
     var body: some View {
-        HStack(spacing: 14) {
-            Image(systemName: section.systemImage)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
-                .frame(width: 38, height: 38)
-                .background(
-                    Color.accentColor.opacity(0.12),
-                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-                )
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(section.title)
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-            }
-
+        HStack {
+            Text(section.title)
+                .font(.system(size: 28, weight: .bold))
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 28)
-        .padding(.top, 24)
-        .padding(.bottom, 10)
+        .padding(.horizontal, 30)
+        .padding(.top, 18)
+        .padding(.bottom, 14)
     }
 }
 
@@ -208,14 +110,13 @@ private struct SettingsPane<Content: View>: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 20) {
                 content
             }
-            .frame(maxWidth: 720, alignment: .leading)
+            .frame(maxWidth: 820, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 28)
-            .padding(.top, 14)
-            .padding(.bottom, 24)
+            .padding(.horizontal, 30)
+            .padding(.bottom, 28)
         }
         .scrollIndicators(.hidden)
     }
@@ -245,21 +146,30 @@ private struct SettingsCard<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             if !title.isEmpty {
-                Text(title)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-            }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 14, weight: .semibold))
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                        }
+                }
 
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 18)
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Color(nsColor: .controlBackgroundColor))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor).opacity(0.35), lineWidth: 1)
         )
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -344,6 +254,14 @@ private struct SettingsHint: View {
     }
 }
 
+private struct SettingsSeparator: View {
+    var body: some View {
+        Rectangle()
+            .fill(Color(nsColor: .separatorColor).opacity(0.35))
+            .frame(height: 1)
+    }
+}
+
 // MARK: - General
 
 private struct GeneralTab: View {
@@ -406,7 +324,7 @@ private struct GeneralTab: View {
                         .disabled(settings.compactModeEnabled)
                     }
 
-                    Divider()
+                    SettingsSeparator()
 
                     SettingsRow(
                         title: "精简模式",
@@ -417,7 +335,7 @@ private struct GeneralTab: View {
                             .toggleStyle(.switch)
                     }
 
-                    Divider()
+                    SettingsSeparator()
 
                     SettingsRow(
                         title: "精简面板大小",
@@ -481,7 +399,7 @@ private struct HotkeyTab: View {
                         )
                     }
 
-                    Divider()
+                    SettingsSeparator()
 
                     SettingsHint(text: "单击卡片会先复制内容，再尝试自动键入。首次授予辅助功能权限后建议重启 PasteHub。")
                 }
@@ -510,13 +428,13 @@ private struct HotkeyTab: View {
                             .foregroundStyle(isAccessibilityTrusted ? .green : .red)
                     }
 
-                    Divider()
+                    SettingsSeparator()
 
                     SettingsMetricRow(title: "Bundle ID", value: bundleID, allowsSelection: true)
                     SettingsMetricRow(title: "进程 PID", value: processID, allowsSelection: true)
                     SettingsMetricRow(title: "上次检测", value: Self.timeFormatter.string(from: lastCheckedAt))
 
-                    Divider()
+                    SettingsSeparator()
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text("当前可执行路径")
@@ -538,7 +456,7 @@ private struct HotkeyTab: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
-                    Divider()
+                    SettingsSeparator()
 
                     HStack(spacing: 10) {
                         Button("刷新状态") {
@@ -681,13 +599,13 @@ private struct ExcludedAppsTab: View {
                                 .padding(.vertical, 12)
 
                                 if index < settings.excludedApps.count - 1 {
-                                    Divider()
+                                    SettingsSeparator()
                                 }
                             }
                         }
                     }
 
-                    Divider()
+                    SettingsSeparator()
 
                     Menu {
                         ForEach(availableApps, id: \.bundleID) { app in

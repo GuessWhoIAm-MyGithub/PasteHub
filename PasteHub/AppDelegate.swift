@@ -167,18 +167,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             w.level = panel.level
             w.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
+            DispatchQueue.main.async { [weak self, weak w] in
+                guard let self, let w, self.settingsWindow === w else { return }
+                self.focusSettingsSidebar(in: w)
+            }
             return
         }
 
         let w = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 880, height: 600),
-            styleMask: [.titled, .closable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: true
         )
         w.title = "PasteHub 设置"
         w.titleVisibility = .hidden
         w.titlebarAppearsTransparent = true
+        w.toolbarStyle = .unified
         w.isMovableByWindowBackground = true
         w.contentViewController = NSHostingController(rootView: SettingsView(settings: settings))
         w.minSize = NSSize(width: 820, height: 560)
@@ -190,6 +195,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async { [weak self, weak w] in
             guard let self, let w, self.settingsWindow === w else { return }
             self.centerWindowOnActiveScreen(w)
+            self.focusSettingsSidebar(in: w)
         }
     }
 
@@ -224,6 +230,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             y: visibleFrame.minY + (visibleFrame.height - size.height) / 2
         )
         window.setFrameOrigin(origin)
+    }
+
+    private func focusSettingsSidebar(in window: NSWindow) {
+        guard let contentView = window.contentView,
+              let outlineView = firstSubview(ofType: NSOutlineView.self, in: contentView)
+        else { return }
+
+        window.makeFirstResponder(outlineView)
+    }
+
+    private func firstSubview<T: NSView>(ofType type: T.Type, in view: NSView) -> T? {
+        if let match = view as? T {
+            return match
+        }
+
+        for subview in view.subviews {
+            if let match = firstSubview(ofType: type, in: subview) {
+                return match
+            }
+        }
+
+        return nil
     }
 
     // MARK: - Global Hot Key
