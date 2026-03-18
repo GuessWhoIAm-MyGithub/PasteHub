@@ -27,6 +27,30 @@ enum PanelEdge: String, CaseIterable, Identifiable {
     }
 }
 
+enum CompactPanelSize: String, CaseIterable, Identifiable {
+    case small
+    case medium
+    case large
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .small: return "小"
+        case .medium: return "中"
+        case .large: return "大"
+        }
+    }
+
+    var heightRatio: CGFloat {
+        switch self {
+        case .small: return 0.45
+        case .medium: return 0.60
+        case .large: return 0.75
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class SettingsManager {
@@ -70,9 +94,17 @@ final class SettingsManager {
         }
     }
 
+    var compactPanelSize: CompactPanelSize {
+        didSet {
+            UserDefaults.standard.set(compactPanelSize.rawValue, forKey: "compactPanelSize")
+            onCompactPanelSizeChanged?()
+        }
+    }
+
     var onHotkeyChanged: (() -> Void)?
     var onPanelEdgeChanged: (() -> Void)?
     var onCompactModeChanged: (() -> Void)?
+    var onCompactPanelSizeChanged: (() -> Void)?
 
     init() {
         let d = UserDefaults.standard
@@ -112,6 +144,13 @@ final class SettingsManager {
         }
 
         compactModeEnabled = d.bool(forKey: "compactModeEnabled")
+
+        if let raw = d.string(forKey: "compactPanelSize"),
+           let size = CompactPanelSize(rawValue: raw) {
+            compactPanelSize = size
+        } else {
+            compactPanelSize = .medium
+        }
     }
 
     func setHotkey(keyCode: UInt16, modifiers: UInt) {

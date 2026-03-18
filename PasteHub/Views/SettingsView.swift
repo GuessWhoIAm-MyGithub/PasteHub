@@ -49,7 +49,18 @@ private struct GeneralTab: View {
 
                 Toggle("精简模式", isOn: $settings.compactModeEnabled)
 
+                Picker("精简面板大小", selection: $settings.compactPanelSize) {
+                    ForEach(CompactPanelSize.allCases) { size in
+                        Text(size.title).tag(size)
+                    }
+                }
+                .disabled(!settings.compactModeEnabled)
+
                 Text("打开后，点击状态栏图标会直接弹出精简面板，并以线性列表展示历史记录。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+
+                Text("小 / 中 / 大分别按屏幕高度的 45% / 60% / 75% 计算。")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }

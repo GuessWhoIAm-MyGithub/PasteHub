@@ -8,16 +8,23 @@ final class FloatingPanel: NSPanel, NSWindowDelegate {
     var statusButtonProvider: (() -> NSStatusBarButton?)?
     private let topBottomPanelHeight: CGFloat = 320
     private let sidePanelWidth: CGFloat = 520
-    private let compactPanelWidth: CGFloat = 380
-    private let compactPanelHeight: CGFloat = 480
-    private let compactPanelMargin: CGFloat = 10
+    private let compactPanelWidth: CGFloat = CompactPanelLayout.width
+    private let compactPanelMargin: CGFloat = CompactPanelLayout.margin
     private let travelDistance: CGFloat = 18
     private let panelCornerRadius: CGFloat = 18
 
     init(rootView: some View, settings: SettingsManager) {
         self.settings = settings
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 620),
+            contentRect: NSRect(
+                x: 0,
+                y: 0,
+                width: compactPanelWidth,
+                height: CompactPanelLayout.height(
+                    for: NSScreen.main,
+                    size: settings.compactPanelSize
+                )
+            ),
             styleMask: [.borderless],
             backing: .buffered,
             defer: true
@@ -193,7 +200,7 @@ final class FloatingPanel: NSPanel, NSWindowDelegate {
 
     private func compactShownFrame(on screen: NSScreen, visibleFrame: NSRect) -> NSRect {
         let width = min(compactPanelWidth, visibleFrame.width - compactPanelMargin * 2)
-        let height = min(compactPanelHeight, visibleFrame.height - compactPanelMargin * 2)
+        let height = CompactPanelLayout.height(for: screen, size: settings.compactPanelSize)
         let anchorFrame = statusButtonFrameOnScreen() ?? fallbackAnchorFrame(in: screen.frame)
 
         let preferredX = anchorFrame.midX - width / 2

@@ -93,8 +93,7 @@ struct ClipboardListView: View {
     private let horizontalSnippetHeight: CGFloat = 170
     private let horizontalScrollerGap: CGFloat = 8
     private let panelCornerRadius: CGFloat = 18
-    private let compactPanelWidth: CGFloat = 380
-    private let compactPanelHeight: CGFloat = 480
+    private let compactPanelWidth: CGFloat = CompactPanelLayout.width
     private let compactGridSpacing: CGFloat = 8
     private let compactColumnWidth: CGFloat = 172
     private let compactImageCardSize: CGFloat = 172
@@ -248,22 +247,25 @@ struct ClipboardListView: View {
     }
 
     private var compactModeBody: some View {
-        ZStack {
-            panelBackground
+        GeometryReader { _ in
+            ZStack {
+                panelBackground
 
-            VStack(spacing: 12) {
-                compactHeader
-                compactHistoryList
+                VStack(spacing: 12) {
+                    compactHeader
+                    compactHistoryList
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 14)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                collapseSearchIfNeeded()
+            }
+            .clipShape(RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous))
         }
-        .frame(width: compactPanelWidth, height: compactPanelHeight)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            collapseSearchIfNeeded()
-        }
-        .clipShape(RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous))
+        .frame(width: compactPanelWidth)
     }
 
     private var panelBackground: some View {
@@ -1074,6 +1076,17 @@ private struct CompactClipboardCard: View {
         Button(action: onPrimaryAction) {
             ZStack(alignment: .topLeading) {
                 imageCardBackground
+
+                VStack(spacing: 0) {
+                    LinearGradient(
+                        colors: [.black.opacity(0.52), .black.opacity(0.18), .clear],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 78)
+
+                    Spacer(minLength: 0)
+                }
 
                 compactMetaRow(foreground: .white.opacity(0.96), secondary: .white.opacity(0.78))
                     .padding(.horizontal, 10)

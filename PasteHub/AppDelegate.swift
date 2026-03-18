@@ -38,6 +38,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.configureStatusItemInteraction()
             self?.panel?.updatePlacementIfVisible()
         }
+        settings.onCompactPanelSizeChanged = { [weak self] in
+            self?.panel?.updatePlacementIfVisible()
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
