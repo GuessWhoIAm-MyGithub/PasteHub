@@ -684,15 +684,6 @@ private struct AboutTab: View {
                     }
                 }
 
-                SettingsCard(
-                    title: "应用信息",
-                    subtitle: ""
-                ) {
-                    VStack(spacing: 12) {
-                        AboutInfoRow(icon: "tag.fill", title: "版本", value: version)
-                        AboutInfoRow(icon: "hammer.fill", title: "构建", value: build)
-                    }
-                }
             }
 
             Spacer(minLength: 0)
@@ -709,36 +700,15 @@ private struct AboutTab: View {
                     Text("·")
                         .font(.system(size: 11))
                         .foregroundStyle(.quaternary)
-                    AboutFooterLink(icon: "heart.fill", label: "@Coolapk", destination: coolapkURL)
+                    AboutFooterLink(icon: "heart.fill", label: "鸣谢酷安", destination: coolapkURL)
                 }
+
+                Text("\(version)(\(build))")
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(.quaternary)
             }
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.bottom, 18)
-        }
-    }
-}
-
-private struct AboutInfoRow: View {
-    let icon: String
-    let title: String
-    let value: String
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
-                .frame(width: 18)
-
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-
-            Spacer()
-
-            Text(value)
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
         }
     }
 }

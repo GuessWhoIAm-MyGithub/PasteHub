@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotKeyRef: EventHotKeyRef?
     private var hotKeyHandlerRef: EventHandlerRef?
     private var settingsWindow: NSWindow?
+    private var shouldPresentSettingsAfterPanelHides = false
     private var lastHotKeyTriggerTime: TimeInterval = 0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -137,7 +138,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 store: store,
                 settings: settings,
                 onOpenSettings: { [weak self] in
-                    self?.showSettings()
+                    self?.openSettingsFromPanel()
                 },
                 onActivateItem: { [weak self] item in
                     self?.handleItemActivation(item)
@@ -149,7 +150,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.statusItem.button
         }
         panel.onDidHide = { [weak self] in
-            self?.settingsWindow?.close()
+            guard let self else { return }
+
+            if self.shouldPresentSettingsAfterPanelHides {
+                self.shouldPresentSettingsAfterPanelHides = false
+                self.presentSettingsWindow(centerBeforeShowing: true)
+                return
+            }
+
+            self.settingsWindow?.close()
         }
     }
 
@@ -163,12 +172,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Settings
 
     @objc func showSettings() {
+        presentSettingsWindow(centerBeforeShowing: false)
+    }
+
+    private func openSettingsFromPanel() {
+        guard panel?.isVisible == true else {
+            presentSettingsWindow(centerBeforeShowing: true)
+            return
+        }
+
+        shouldPresentSettingsAfterPanelHides = true
+        panel?.close()
+    }
+
+    private func presentSettingsWindow(centerBeforeShowing: Bool) {
         if let w = settingsWindow {
             w.level = panel.level
+            if centerBeforeShowing {
+                centerWindowOnActiveScreen(w)
+            }
             w.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             DispatchQueue.main.async { [weak self, weak w] in
                 guard let self, let w, self.settingsWindow === w else { return }
+                if !centerBeforeShowing {
+                    self.centerWindowOnActiveScreen(w)
+                }
                 self.focusSettingsSidebar(in: w)
             }
             return
@@ -178,7 +207,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             contentRect: NSRect(x: 0, y: 0, width: 880, height: 600),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
-            defer: true
+            defer: !centerBeforeShowing
         )
         w.title = "PasteHub 设置"
         w.titleVisibility = .hidden
@@ -189,12 +218,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         w.minSize = NSSize(width: 820, height: 560)
         w.isReleasedWhenClosed = false
         w.level = panel.level
+        if centerBeforeShowing {
+            settingsWindow = w
+            centerWindowOnActiveScreen(w)
+        }
         w.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        settingsWindow = w
+        if !centerBeforeShowing {
+            settingsWindow = w
+        }
         DispatchQueue.main.async { [weak self, weak w] in
             guard let self, let w, self.settingsWindow === w else { return }
-            self.centerWindowOnActiveScreen(w)
+            if !centerBeforeShowing {
+                self.centerWindowOnActiveScreen(w)
+            }
             self.focusSettingsSidebar(in: w)
         }
     }
