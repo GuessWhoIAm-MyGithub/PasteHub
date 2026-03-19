@@ -149,7 +149,7 @@ private struct SettingsCard<Content: View>: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(.system(size: 14, weight: .semibold))
-                    if let subtitle {
+                    if let subtitle, !subtitle.isEmpty {
                         Text(subtitle)
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
@@ -273,7 +273,7 @@ private struct GeneralTab: View {
         SettingsPane {
             SettingsCard(
                 title: "历史记录",
-                subtitle: "控制自动保留的剪贴板历史数量。"
+                subtitle: ""
             ) {
                 SettingsRow(
                     title: "最大保留条数",
@@ -292,7 +292,7 @@ private struct GeneralTab: View {
 
             SettingsCard(
                 title: "系统",
-                subtitle: "管理 PasteHub 与系统的集成方式。"
+                subtitle: ""
             ) {
                 SettingsRow(
                     title: "开机自动启动",
@@ -306,7 +306,7 @@ private struct GeneralTab: View {
 
             SettingsCard(
                 title: "面板",
-                subtitle: "控制主面板和精简面板的显示行为。"
+                subtitle: ""
             ) {
                 VStack(alignment: .leading, spacing: 14) {
                     SettingsRow(
@@ -384,7 +384,7 @@ private struct HotkeyTab: View {
         SettingsPane {
             SettingsCard(
                 title: "全局快捷键",
-                subtitle: "录制新的组合键后即可立即生效。"
+                subtitle: ""
             ) {
                 VStack(alignment: .leading, spacing: 14) {
                     SettingsRow(
@@ -407,7 +407,7 @@ private struct HotkeyTab: View {
 
             SettingsCard(
                 title: "内置快捷入口",
-                subtitle: "应用菜单和常用操作的固定触发方式。"
+                subtitle: ""
             ) {
                 VStack(alignment: .leading, spacing: 12) {
                     ShortcutRow(label: "打开设置", shortcut: "\u{2318},")
@@ -419,7 +419,7 @@ private struct HotkeyTab: View {
 
             SettingsCard(
                 title: "辅助功能权限诊断",
-                subtitle: "若自动键入异常，可先检查当前运行实例和系统授权是否一致。"
+                subtitle: ""
             ) {
                 VStack(alignment: .leading, spacing: 14) {
                     SettingsRow(title: "辅助功能权限") {
@@ -554,7 +554,7 @@ private struct ExcludedAppsTab: View {
         SettingsPane {
             SettingsCard(
                 title: "排除应用",
-                subtitle: "来自这些应用的剪贴板内容将不会被记录。"
+                subtitle: ""
             ) {
                 VStack(alignment: .leading, spacing: 16) {
                     if settings.excludedApps.isEmpty {
@@ -565,6 +565,9 @@ private struct ExcludedAppsTab: View {
                             Text("暂无排除应用")
                                 .font(.system(size: 15, weight: .semibold, design: .rounded))
                             Text("可从当前正在运行的应用里快速加入排除名单。")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                            Text("添加到这里的应用将不会被 PasteHub 记录")
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
                         }
@@ -648,6 +651,8 @@ private struct ExcludedAppsTab: View {
 private struct AboutTab: View {
     private let author = "FringHuang"
     private let email = "hfl1995@gmail.com"
+    private let githubURL = URL(string: "https://github.com/lageev/PasteHub")!
+    private let coolapkURL = URL(string: "https://www.coolapk.com")!
     @State private var didCopyEmail = false
 
     private var version: String {
@@ -659,71 +664,85 @@ private struct AboutTab: View {
     }
 
     var body: some View {
-        SettingsPane {
-            SettingsCard {
-                HStack(spacing: 16) {
-                    Image(nsImage: NSApp.applicationIconImage)
-                        .resizable()
-                        .frame(width: 58, height: 58)
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        VStack(spacing: 0) {
+            SettingsPane {
+                SettingsCard {
+                    HStack(spacing: 16) {
+                        Image(nsImage: NSApp.applicationIconImage)
+                            .resizable()
+                            .frame(width: 58, height: 58)
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("PasteHub")
-                            .font(.system(size: 22, weight: .bold, design: .rounded))
-                        Text("简洁高效的剪贴板助手")
-                            .font(.system(size: 13))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer(minLength: 0)
-                }
-            }
-
-            SettingsCard(
-                title: "应用信息",
-                subtitle: "版本、构建号与维护者信息。"
-            ) {
-                VStack(spacing: 12) {
-                    AboutInfoRow(icon: "tag.fill", title: "版本", value: version)
-                    AboutInfoRow(icon: "hammer.fill", title: "构建", value: build)
-                    AboutInfoRow(icon: "person.fill", title: "作者", value: author)
-
-                    HStack(spacing: 10) {
-                        Image(systemName: "envelope.fill")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color.accentColor)
-                            .frame(width: 18)
-                        Text("邮箱")
-                            .font(.system(size: 13, weight: .semibold))
-                        Spacer()
-                        Button {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(email, forType: .string)
-                            withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
-                                didCopyEmail = true
-                            }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                                withAnimation(.easeOut(duration: 0.2)) {
-                                    didCopyEmail = false
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 4) {
-                                if didCopyEmail {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .transition(.scale.combined(with: .opacity))
-                                }
-                                Text(didCopyEmail ? "已复制" : email)
-                            }
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("PasteHub")
+                                .font(.system(size: 22, weight: .bold, design: .rounded))
+                            Text("简洁高效的剪贴板助手")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.secondary)
                         }
-                        .buttonStyle(.plain)
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(didCopyEmail ? .green : .secondary)
-                        .scaleEffect(didCopyEmail ? 1.04 : 1.0)
-                        .animation(.spring(response: 0.28, dampingFraction: 0.72), value: didCopyEmail)
+
+                        Spacer(minLength: 0)
+                    }
+                }
+
+                SettingsCard(
+                    title: "应用信息",
+                    subtitle: ""
+                ) {
+                    VStack(spacing: 12) {
+                        AboutInfoRow(icon: "tag.fill", title: "版本", value: version)
+                        AboutInfoRow(icon: "hammer.fill", title: "构建", value: build)
+                        AboutInfoRow(icon: "person.fill", title: "作者", value: author)
+
+                        HStack(spacing: 10) {
+                            Image(systemName: "envelope.fill")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Color.accentColor)
+                                .frame(width: 18)
+                            Text("邮箱")
+                                .font(.system(size: 13, weight: .semibold))
+                            Spacer()
+                            Button {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(email, forType: .string)
+                                withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) {
+                                    didCopyEmail = true
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                    withAnimation(.easeOut(duration: 0.2)) {
+                                        didCopyEmail = false
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    if didCopyEmail {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .transition(.scale.combined(with: .opacity))
+                                    }
+                                    Text(didCopyEmail ? "已复制" : email)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundStyle(didCopyEmail ? .green : .secondary)
+                            .scaleEffect(didCopyEmail ? 1.04 : 1.0)
+                            .animation(.spring(response: 0.28, dampingFraction: 0.72), value: didCopyEmail)
+                        }
                     }
                 }
             }
+
+            Spacer(minLength: 0)
+
+            HStack(spacing: 6) {
+                AboutFooterLink(icon: "cat.fill", label: "GitHub", destination: githubURL)
+                Text("·")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.quaternary)
+                AboutFooterLink(icon: "heart.fill", label: "@Coolapk", destination: coolapkURL)
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.bottom, 18)
         }
     }
 }
@@ -750,6 +769,35 @@ private struct AboutInfoRow: View {
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
         }
+    }
+}
+
+private struct AboutFooterLink: View {
+    let icon: String
+    let label: String
+    let destination: URL
+    @State private var isHovering = false
+
+    var body: some View {
+        Link(destination: destination) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 10, weight: .medium))
+                Text(label)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+            }
+            .foregroundStyle(isHovering ? Color.accentColor : .secondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                Capsule()
+                    .fill(isHovering ? Color.accentColor.opacity(0.08) : .clear)
+            )
+            .contentShape(Capsule())
+            .onHover { isHovering = $0 }
+            .animation(.easeOut(duration: 0.15), value: isHovering)
+        }
+        .buttonStyle(.plain)
     }
 }
 
