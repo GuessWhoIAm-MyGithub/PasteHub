@@ -31,7 +31,7 @@ private enum ClipboardFilter: String, CaseIterable, Identifiable {
         switch self {
         case .all: return true
         case .text: return item.type == .text
-        case .image: return item.type == .image
+        case .image: return item.isImageLikeItem
         case .file: return item.type == .file
         }
     }
@@ -858,7 +858,7 @@ struct ClipboardListView: View {
     private func estimatedHeight(for item: ClipboardItem) -> CGFloat {
         switch item.type {
         case .image: return 200
-        case .file: return 100
+        case .file: return item.isImageLikeItem ? 200 : 100
         case .text:
             let len = item.displayText.count
             if len > 100 { return 150 }
@@ -872,7 +872,7 @@ struct ClipboardListView: View {
         case .image:
             return compactImageCardSize
         case .file:
-            return 110
+            return item.isImageLikeItem ? compactImageCardSize : 110
         case .text:
             let len = item.displayText.count
             if len > 120 { return 160 }
@@ -1154,6 +1154,9 @@ private struct CompactClipboardCard: View {
     @State private var isHovering = false
 
     private var accent: Color {
+        if item.isImageLikeItem {
+            return Color(red: 0.34, green: 0.68, blue: 1.00)
+        }
         switch item.type {
         case .text: return Color(red: 0.20, green: 0.78, blue: 0.76)
         case .image: return Color(red: 0.34, green: 0.68, blue: 1.00)
@@ -1162,7 +1165,7 @@ private struct CompactClipboardCard: View {
     }
 
     private var previewImage: NSImage? {
-        guard item.type == .image, let url = item.contentURL else { return nil }
+        guard item.isImageLikeItem, let url = item.contentURL else { return nil }
         let key = url as NSURL
         if let cached = ImagePreviewCache.shared.object(forKey: key) {
             return cached
@@ -1199,7 +1202,7 @@ private struct CompactClipboardCard: View {
     }
 
     private var isImageCard: Bool {
-        item.type == .image
+        item.isImageLikeItem
     }
 
     var body: some View {
@@ -1292,7 +1295,7 @@ private struct CompactClipboardCard: View {
             Rectangle()
                 .fill(accent.opacity(0.18))
                 .overlay {
-                    Image(systemName: item.type.icon)
+                    Image(systemName: "photo")
                         .font(.system(size: 28, weight: .semibold))
                         .foregroundStyle(accent)
                 }
@@ -1340,7 +1343,7 @@ private struct CompactClipboardCard: View {
 
     private func compactMetaRow(foreground: Color, secondary: Color) -> some View {
         HStack(spacing: 4) {
-            Image(systemName: item.type.icon)
+            Image(systemName: item.isImageLikeItem ? ClipboardContentType.image.icon : item.type.icon)
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(foreground)
                 .frame(width: 16, height: 16)
@@ -1584,6 +1587,9 @@ private struct ClipboardCard: View {
     }
 
     private var accent: Color {
+        if item.isImageLikeItem {
+            return Color(red: 0.34, green: 0.68, blue: 1.00)
+        }
         switch item.type {
         case .text: return Color(red: 0.20, green: 0.78, blue: 0.76)
         case .image: return Color(red: 0.34, green: 0.68, blue: 1.00)
@@ -1592,7 +1598,7 @@ private struct ClipboardCard: View {
     }
 
     private var previewImage: NSImage? {
-        guard item.type == .image, let url = item.contentURL else { return nil }
+        guard item.isImageLikeItem, let url = item.contentURL else { return nil }
         let key = url as NSURL
         if let cached = ImagePreviewCache.shared.object(forKey: key) {
             return cached
@@ -1628,13 +1634,170 @@ private struct ClipboardCard: View {
         return nil
     }
 
-    var body: some View {
+    /// 与精简模式大图卡片一致：含顶/底边横向列表（`compactStyle == true`）时的图片项。
+    private var usesFullBleedImageLayout: Bool {
+        item.isImageLikeItem
+    }
+
+    private static let verticalImageCardHeight: CGFloat = 200
+
+    private var fullBleedImageHeight: CGFloat {
+        preferredHeight ?? Self.verticalImageCardHeight
+    }
+
+    @ViewBuilder
+    private var nonCompactImageFillBackground: some View {
+        if let previewImage {
+            Image(nsImage: previewImage)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fill)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+        } else {
+            Rectangle()
+                .fill(accent.opacity(0.18))
+                .overlay {
+                    Image(systemName: "photo")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(accent)
+                }
+        }
+    }
+
+    private var nonCompactImageMetaRow: some View {
+        HStack(spacing: 4) {
+            Image(systemName: ClipboardContentType.image.icon)
+                .font(.system(size: 10, weight: .semibold))
+            Text(ClipboardContentType.image.label)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+        }
+        .foregroundStyle(.white.opacity(0.96))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.black.opacity(0.34), in: Capsule())
+    }
+
+    private var nonCompactImageFooterRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if item.type == .file {
+                Text(item.displayText)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.96))
+                    .lineLimit(1)
+            }
+
+            HStack(spacing: 6) {
+                Image(systemName: "clock")
+                    .font(.system(size: 10))
+                Text(ClipboardTimeFormatter.shared.string(from: item.timestamp))
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+
+                if !item.tags.isEmpty {
+                    Text(item.tags.prefix(1).map { "#\($0)" }.joined())
+                        .lineLimit(1)
+                }
+
+                if let app = item.sourceApp, !app.isEmpty {
+                    Spacer()
+                    HStack(spacing: 4) {
+                        if let sourceAppIcon {
+                            Image(nsImage: sourceAppIcon)
+                                .resizable()
+                                .interpolation(.high)
+                                .frame(width: 12, height: 12)
+                                .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                        }
+                        Text(app)
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.black.opacity(0.26), in: Capsule())
+                }
+            }
+            .font(.system(size: 10, weight: .medium, design: .rounded))
+            .foregroundStyle(.white.opacity(0.9))
+        }
+    }
+
+    private var fullBleedImageCardBody: some View {
+        ZStack {
+            nonCompactImageFillBackground
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(width: preferredWidth, height: fullBleedImageHeight)
+        .frame(maxWidth: preferredWidth == nil ? .infinity : nil)
+            .overlay {
+                LinearGradient(
+                    colors: [.black.opacity(0.16), .clear, .black.opacity(0.12)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            }
+            .overlay(alignment: .top) {
+                LinearGradient(
+                    colors: [.black.opacity(0.72), .black.opacity(0.36), .black.opacity(0.1), .clear],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 98)
+            }
+            .overlay(alignment: .bottom) {
+                LinearGradient(
+                    colors: [.clear, .black.opacity(0.46), .black.opacity(0.82)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 80)
+            }
+            .overlay(alignment: .topLeading) {
+                HStack(alignment: .top, spacing: 8) {
+                    nonCompactImageMetaRow
+                        .shadow(color: .black.opacity(0.18), radius: 8, x: 0, y: 2)
+                    Spacer(minLength: 0)
+                    HStack(spacing: 6) {
+                        Button(action: onCopy) {
+                            Image(systemName: "doc.on.doc")
+                        }
+                        .buttonStyle(CardIconButtonStyle(tint: accent))
+
+                        Button(role: .destructive, action: onDelete) {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(CardIconButtonStyle(tint: .pink))
+                    }
+                    .opacity(isHovering ? 1 : 0)
+                    .shadow(color: .black.opacity(0.24), radius: 6, x: 0, y: 1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 10)
+                .padding(.top, 9)
+            }
+            .overlay(alignment: .bottomLeading) {
+                nonCompactImageFooterRow
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 8)
+            }
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor).opacity(isHovering ? 0.86 : 0.72))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+        )
+    }
+
+    private var standardCardContent: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 HStack(spacing: 4) {
-                    Image(systemName: item.type.icon)
+                    Image(systemName: item.isImageLikeItem ? ClipboardContentType.image.icon : item.type.icon)
                         .font(.system(size: 10, weight: .semibold))
-                    Text(item.type.label)
+                    Text(item.isImageLikeItem ? ClipboardContentType.image.label : item.type.label)
                         .font(.system(size: 10, weight: .semibold, design: .rounded))
                 }
                 .foregroundStyle(accent)
@@ -1656,24 +1819,6 @@ private struct ClipboardCard: View {
                     .buttonStyle(CardIconButtonStyle(tint: .pink))
                 }
                 .opacity(isHovering ? 1 : 0)
-            }
-
-            if let previewImage {
-                if compactStyle {
-                    Image(nsImage: previewImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 64)
-                        .clipped()
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                } else {
-                    Image(nsImage: previewImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(maxWidth: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
             }
 
             Text(item.displayText)
@@ -1715,16 +1860,27 @@ private struct ClipboardCard: View {
             }
             .foregroundStyle(.secondary)
         }
-        .padding(compactStyle ? 8 : 10)
+    }
+
+    var body: some View {
+        Group {
+            if usesFullBleedImageLayout {
+                fullBleedImageCardBody
+            } else {
+                standardCardContent
+                    .padding(compactStyle ? 8 : 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color(nsColor: .controlBackgroundColor).opacity(0.72))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+                    )
+            }
+        }
+        .frame(maxWidth: usesFullBleedImageLayout && preferredWidth == nil ? .infinity : nil)
         .frame(width: preferredWidth, height: preferredHeight, alignment: .topLeading)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.72))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
-        )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Color.accentColor.opacity(isPressing ? 0.08 : 0))

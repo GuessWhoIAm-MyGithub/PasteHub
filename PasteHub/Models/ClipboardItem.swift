@@ -1,4 +1,5 @@
 import Foundation
+import UniformTypeIdentifiers
 
 enum ClipboardContentType: String, Codable {
     case text
@@ -100,5 +101,31 @@ struct ClipboardItem: Identifiable, Codable {
             return URL(fileURLWithPath: content)
         }
         return nil
+    }
+
+    private static let imageFilenameExtensions: Set<String> = [
+        "png", "jpg", "jpeg", "gif", "heic", "heif", "webp", "bmp", "tif", "tiff", "ico", "avif", "jfif"
+    ]
+
+    /// 剪贴板「图片」位图项，或本地路径且扩展名为常见图片的文件项（与列表大图预览、筛选一致）。
+    var isImageLikeItem: Bool {
+        switch type {
+        case .image:
+            return true
+        case .file:
+            guard let url = contentURL, url.isFileURL else { return false }
+            return Self.isImageFileURL(url)
+        case .text:
+            return false
+        }
+    }
+
+    private static func isImageFileURL(_ url: URL) -> Bool {
+        let ext = url.pathExtension.lowercased()
+        guard !ext.isEmpty else { return false }
+        if let ut = UTType(filenameExtension: ext), ut.conforms(to: .image) {
+            return true
+        }
+        return imageFilenameExtensions.contains(ext)
     }
 }
