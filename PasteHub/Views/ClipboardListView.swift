@@ -882,31 +882,37 @@ struct ClipboardListView: View {
 
     private var verticalWaterfallContent: some View {
         ScrollViewReader { proxy in
-            ScrollView {
-                let columns = waterfallColumns(from: filteredItems)
-                HStack(alignment: .top, spacing: 10) {
-                    ForEach(0..<2, id: \.self) { col in
-                        LazyVStack(spacing: 10) {
-                            ForEach(columns[col]) { item in
-                                ClipboardCard(
-                                    item: item,
-                                    onPrimaryAction: {
-                                        selectedHistoryItemID = item.id
-                                        activateClipboardItem(item)
-                                    },
-                                    onCopy: { store.copyToClipboard(item) },
-                                    onDelete: { store.remove(item) },
-                                    onManageTags: { tagEditorItem = item },
-                                    onSaveAsSnippet: { quickSaveAsSnippet(item) },
-                                    onTokenSelect: { tokenSelectionItem = item },
-                                    isSelected: selectedHistoryItemID == item.id,
-                                    quickShortcutLabel: historyQuickLabelsByID[item.id]
-                                )
+            GeometryReader { geometry in
+                ScrollView {
+                    let columns = waterfallColumns(from: filteredItems)
+                    let columnWidth = max((geometry.size.width - 10) / 2, 220)
+                    HStack(alignment: .top, spacing: 10) {
+                        ForEach(0..<2, id: \.self) { col in
+                            LazyVStack(spacing: 10) {
+                                ForEach(columns[col]) { item in
+                                    ClipboardCard(
+                                        item: item,
+                                        onPrimaryAction: {
+                                            selectedHistoryItemID = item.id
+                                            activateClipboardItem(item)
+                                        },
+                                        onCopy: { store.copyToClipboard(item) },
+                                        onDelete: { store.remove(item) },
+                                        onManageTags: { tagEditorItem = item },
+                                        onSaveAsSnippet: { quickSaveAsSnippet(item) },
+                                        onTokenSelect: { tokenSelectionItem = item },
+                                        preferredWidth: columnWidth,
+                                        isSelected: selectedHistoryItemID == item.id,
+                                        quickShortcutLabel: historyQuickLabelsByID[item.id]
+                                    )
+                                }
                             }
+                            .frame(width: columnWidth, alignment: .top)
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 4)
             }
             .onChange(of: selectedHistoryItemID) { _, selectedID in
                 guard let selectedID else { return }
