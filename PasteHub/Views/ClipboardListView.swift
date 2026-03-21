@@ -75,6 +75,8 @@ struct ClipboardListView: View {
     @State private var isCommandModifierPressed = false
     @State private var visibleHistoryItemIDs: Set<UUID> = []
     @State private var visibleSnippetItemIDs: Set<UUID> = []
+    @State private var horizontalHistoryViewportRangeX: ClosedRange<CGFloat>?
+    @State private var horizontalSnippetViewportRangeX: ClosedRange<CGFloat>?
 
     init(
         store: ClipboardStore,
@@ -196,26 +198,56 @@ struct ClipboardListView: View {
         filteredSnippets.filter { visibleSnippetItemIDs.contains($0.id) }
     }
 
+    private var horizontalVisibleHistoryItems: [ClipboardItem] {
+        guard let visibleRange = horizontalHistoryViewportRangeX else { return [] }
+        let itemStride = horizontalCardWidth + 8
+        return filteredItems.enumerated().compactMap { index, item in
+            let minX = CGFloat(index) * itemStride
+            let maxX = minX + horizontalCardWidth
+            return maxX > visibleRange.lowerBound && minX < visibleRange.upperBound ? item : nil
+        }
+    }
+
+    private var horizontalVisibleSnippetItems: [SnippetItem] {
+        guard let visibleRange = horizontalSnippetViewportRangeX else { return [] }
+        let itemStride = horizontalSnippetWidth + 8
+        return filteredSnippets.enumerated().compactMap { index, snippet in
+            let minX = CGFloat(index) * itemStride
+            let maxX = minX + horizontalSnippetWidth
+            return maxX > visibleRange.lowerBound && minX < visibleRange.upperBound ? snippet : nil
+        }
+    }
+
     private var quickShortcutCapacity: Int {
         Self.quickShortcutKeys.count
     }
 
     private var quickSelectableHistoryItems: [ClipboardItem] {
-        let sourceItems = visibleHistoryItems.isEmpty ? filteredItems : visibleHistoryItems
+        let sourceItems = useHorizontalWaterfall
+            ? horizontalVisibleHistoryItems
+            : (visibleHistoryItems.isEmpty ? filteredItems : visibleHistoryItems)
         return Array(sourceItems.prefix(quickShortcutCapacity))
     }
 
     private var quickSelectableSnippets: [SnippetItem] {
-        let sourceSnippets = visibleSnippetItems.isEmpty ? filteredSnippets : visibleSnippetItems
+        let sourceSnippets = useHorizontalWaterfall
+            ? horizontalVisibleSnippetItems
+            : (visibleSnippetItems.isEmpty ? filteredSnippets : visibleSnippetItems)
         return Array(sourceSnippets.prefix(quickShortcutCapacity))
     }
 
     private var firstVisibleHistoryItemID: UUID? {
-        (visibleHistoryItems.isEmpty ? filteredItems : visibleHistoryItems).first?.id
+        if useHorizontalWaterfall {
+            return horizontalVisibleHistoryItems.first?.id
+        }
+        return (visibleHistoryItems.isEmpty ? filteredItems : visibleHistoryItems).first?.id
     }
 
     private var firstVisibleSnippetItemID: UUID? {
-        (visibleSnippetItems.isEmpty ? filteredSnippets : visibleSnippetItems).first?.id
+        if useHorizontalWaterfall {
+            return horizontalVisibleSnippetItems.first?.id
+        }
+        return (visibleSnippetItems.isEmpty ? filteredSnippets : visibleSnippetItems).first?.id
     }
 
     private var historyQuickLabelsByID: [UUID: String] {
@@ -351,6 +383,8 @@ struct ClipboardListView: View {
             isCommandModifierPressed = false
             visibleHistoryItemIDs.removeAll()
             visibleSnippetItemIDs.removeAll()
+            horizontalHistoryViewportRangeX = nil
+            horizontalSnippetViewportRangeX = nil
         }
         .onReceive(NotificationCenter.default.publisher(for: .panelSelectionMove)) { notification in
             guard let directionRaw = notification.userInfo?["direction"] as? String,
@@ -724,6 +758,14 @@ struct ClipboardListView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.vertical, 2)
+                .background(
+                    ScrollWheelInterventionObserver {
+                        if selectedHistoryItemID != nil {
+                            selectedHistoryItemID = nil
+                        }
+                    }
+                    .frame(width: 0, height: 0)
+                )
             }
             .onChange(of: selectedHistoryItemID) { _, selectedID in
                 guard let selectedID else { return }
@@ -763,6 +805,14 @@ struct ClipboardListView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 2)
+                .background(
+                    ScrollWheelInterventionObserver {
+                        if selectedSnippetItemID != nil {
+                            selectedSnippetItemID = nil
+                        }
+                    }
+                    .frame(width: 0, height: 0)
+                )
             }
             .onChange(of: selectedSnippetItemID) { _, selectedID in
                 guard let selectedID else { return }
@@ -973,6 +1023,14 @@ struct ClipboardListView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 4)
+                    .background(
+                        ScrollWheelInterventionObserver {
+                            if selectedHistoryItemID != nil {
+                                selectedHistoryItemID = nil
+                            }
+                        }
+                        .frame(width: 0, height: 0)
+                    )
                 }
             }
             .onChange(of: selectedHistoryItemID) { _, selectedID in
@@ -987,7 +1045,17 @@ struct ClipboardListView: View {
     private var horizontalWaterfallContent: some View {
         HorizontalWheelScrollView(
             indicatorBottomInset: horizontalScrollerGap,
-            targetVisibleRangeX: horizontalHistoryVisibleRangeX
+            targetVisibleRangeX: horizontalHistoryVisibleRangeX,
+            onVisibleRangeChange: { rangeX in
+                if horizontalHistoryViewportRangeX != rangeX {
+                    horizontalHistoryViewportRangeX = rangeX
+                }
+            },
+            onUserScrollIntervention: {
+                if selectedHistoryItemID != nil {
+                    selectedHistoryItemID = nil
+                }
+            }
         ) {
             LazyHStack(alignment: .top, spacing: 8) {
                 ForEach(filteredItems) { item in
@@ -1047,6 +1115,14 @@ struct ClipboardListView: View {
                     }
                 }
                 .padding(.vertical, 4)
+                .background(
+                    ScrollWheelInterventionObserver {
+                        if selectedSnippetItemID != nil {
+                            selectedSnippetItemID = nil
+                        }
+                    }
+                    .frame(width: 0, height: 0)
+                )
             }
             .onChange(of: selectedSnippetItemID) { _, selectedID in
                 guard let selectedID else { return }
@@ -1060,7 +1136,17 @@ struct ClipboardListView: View {
     private var horizontalSnippetContent: some View {
         HorizontalWheelScrollView(
             indicatorBottomInset: horizontalScrollerGap,
-            targetVisibleRangeX: horizontalSnippetVisibleRangeX
+            targetVisibleRangeX: horizontalSnippetVisibleRangeX,
+            onVisibleRangeChange: { rangeX in
+                if horizontalSnippetViewportRangeX != rangeX {
+                    horizontalSnippetViewportRangeX = rangeX
+                }
+            },
+            onUserScrollIntervention: {
+                if selectedSnippetItemID != nil {
+                    selectedSnippetItemID = nil
+                }
+            }
         ) {
             LazyHStack(alignment: .top, spacing: 8) {
                 ForEach(filteredSnippets) { snippet in
@@ -1393,8 +1479,18 @@ struct ClipboardListView: View {
     private func moveSelection(direction: SelectionDirection) {
         if isSnippetMode {
             let ids = filteredSnippets.map(\.id)
+            let currentID = selectedSnippetItemID
+
+            if useHorizontalWaterfall, let currentID {
+                let visibleSnippetIDSet = Set(horizontalVisibleSnippetItems.map(\.id))
+                if !visibleSnippetIDSet.contains(currentID) {
+                    self.selectedSnippetItemID = firstVisibleSnippetItemID
+                    return
+                }
+            }
+
             selectedSnippetItemID = advancedSelectionID(
-                currentID: selectedSnippetItemID,
+                currentID: currentID,
                 allIDs: ids,
                 step: direction.sequentialStep,
                 startID: firstVisibleSnippetItemID
@@ -1408,8 +1504,18 @@ struct ClipboardListView: View {
         }
 
         let ids = filteredItems.map(\.id)
+        let currentID = selectedHistoryItemID
+
+        if useHorizontalWaterfall, let currentID {
+            let visibleHistoryIDSet = Set(horizontalVisibleHistoryItems.map(\.id))
+            if !visibleHistoryIDSet.contains(currentID) {
+                self.selectedHistoryItemID = firstVisibleHistoryItemID
+                return
+            }
+        }
+
         selectedHistoryItemID = advancedSelectionID(
-            currentID: selectedHistoryItemID,
+            currentID: currentID,
             allIDs: ids,
             step: direction.sequentialStep,
             startID: firstVisibleHistoryItemID
@@ -1812,18 +1918,84 @@ private struct CompactClipboardCard: View {
     }
 }
 
+private struct ScrollWheelInterventionObserver: NSViewRepresentable {
+    let onUserScrollIntervention: () -> Void
+
+    func makeNSView(context: Context) -> ScrollWheelObservationView {
+        let view = ScrollWheelObservationView()
+        view.onUserScrollIntervention = onUserScrollIntervention
+        return view
+    }
+
+    func updateNSView(_ nsView: ScrollWheelObservationView, context: Context) {
+        nsView.onUserScrollIntervention = onUserScrollIntervention
+        nsView.attachIfNeeded()
+    }
+}
+
+private final class ScrollWheelObservationView: NSView {
+    var onUserScrollIntervention: (() -> Void)?
+    private weak var observedClipView: NSClipView?
+    private var boundsObserver: NSObjectProtocol?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        attachIfNeeded()
+    }
+
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        attachIfNeeded()
+    }
+
+    deinit {
+        detach()
+    }
+
+    func attachIfNeeded() {
+        guard let clipView = enclosingScrollView?.contentView else { return }
+        guard observedClipView !== clipView else { return }
+        detach()
+        observedClipView = clipView
+        clipView.postsBoundsChangedNotifications = true
+        boundsObserver = NotificationCenter.default.addObserver(
+            forName: NSView.boundsDidChangeNotification,
+            object: clipView,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            guard NSApp.currentEvent?.type == .scrollWheel else { return }
+            self.onUserScrollIntervention?()
+        }
+    }
+
+    private func detach() {
+        if let boundsObserver {
+            NotificationCenter.default.removeObserver(boundsObserver)
+            self.boundsObserver = nil
+        }
+        observedClipView = nil
+    }
+}
+
 private struct HorizontalWheelScrollView<Content: View>: NSViewRepresentable {
     let indicatorBottomInset: CGFloat
     let targetVisibleRangeX: ClosedRange<CGFloat>?
+    let onVisibleRangeChange: ((ClosedRange<CGFloat>) -> Void)?
+    let onUserScrollIntervention: (() -> Void)?
     let content: Content
 
     init(
         indicatorBottomInset: CGFloat = 0,
         targetVisibleRangeX: ClosedRange<CGFloat>? = nil,
+        onVisibleRangeChange: ((ClosedRange<CGFloat>) -> Void)? = nil,
+        onUserScrollIntervention: (() -> Void)? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.indicatorBottomInset = indicatorBottomInset
         self.targetVisibleRangeX = targetVisibleRangeX
+        self.onVisibleRangeChange = onVisibleRangeChange
+        self.onUserScrollIntervention = onUserScrollIntervention
         self.content = content()
     }
 
@@ -1851,7 +2023,12 @@ private struct HorizontalWheelScrollView<Content: View>: NSViewRepresentable {
 
         let hostingView = context.coordinator.hostingView
         context.coordinator.targetVisibleRangeX = targetVisibleRangeX
+        context.coordinator.onVisibleRangeChange = onVisibleRangeChange
         scrollView.documentView = hostingView
+        scrollView.onVisibleRangeChange = { [weak coordinator = context.coordinator] range in
+            coordinator?.onVisibleRangeChange?(range)
+        }
+        scrollView.onUserScrollIntervention = onUserScrollIntervention
         scrollView.onLayout = { [weak scrollView, weak hostingView, weak coordinator = context.coordinator] in
             guard let scrollView, let hostingView else { return }
             Self.syncDocumentFrame(scrollView: scrollView, hostingView: hostingView)
@@ -1860,6 +2037,7 @@ private struct HorizontalWheelScrollView<Content: View>: NSViewRepresentable {
                 scrollView: scrollView,
                 animated: false
             )
+            scrollView.reportVisibleRange(force: true)
         }
         Self.syncDocumentFrame(scrollView: scrollView, hostingView: hostingView)
         Self.ensureVisibleRange(targetRangeX: targetVisibleRangeX, scrollView: scrollView, animated: false)
@@ -1869,7 +2047,12 @@ private struct HorizontalWheelScrollView<Content: View>: NSViewRepresentable {
     func updateNSView(_ scrollView: WheelEnabledHorizontalScrollView, context: Context) {
         let hostingView = context.coordinator.hostingView
         context.coordinator.targetVisibleRangeX = targetVisibleRangeX
+        context.coordinator.onVisibleRangeChange = onVisibleRangeChange
         hostingView.rootView = content
+        scrollView.onVisibleRangeChange = { [weak coordinator = context.coordinator] range in
+            coordinator?.onVisibleRangeChange?(range)
+        }
+        scrollView.onUserScrollIntervention = onUserScrollIntervention
         scrollView.contentInsets = NSEdgeInsets(
             top: 0,
             left: 0,
@@ -1934,6 +2117,7 @@ private struct HorizontalWheelScrollView<Content: View>: NSViewRepresentable {
     final class Coordinator {
         let hostingView: NSHostingView<Content>
         var targetVisibleRangeX: ClosedRange<CGFloat>?
+        var onVisibleRangeChange: ((ClosedRange<CGFloat>) -> Void)?
 
         init(rootView: Content) {
             hostingView = NSHostingView(rootView: rootView)
@@ -1943,7 +2127,10 @@ private struct HorizontalWheelScrollView<Content: View>: NSViewRepresentable {
 
 private final class WheelEnabledHorizontalScrollView: NSScrollView {
     var onLayout: (() -> Void)?
+    var onVisibleRangeChange: ((ClosedRange<CGFloat>) -> Void)?
+    var onUserScrollIntervention: (() -> Void)?
     private var isLayoutCallbackScheduled = false
+    private var lastReportedVisibleRangeX: ClosedRange<CGFloat>?
 
     override func layout() {
         super.layout()
@@ -1953,12 +2140,36 @@ private final class WheelEnabledHorizontalScrollView: NSScrollView {
             guard let self else { return }
             self.isLayoutCallbackScheduled = false
             self.onLayout?()
+            self.reportVisibleRange(force: true)
         }
+    }
+
+    override func reflectScrolledClipView(_ cView: NSClipView) {
+        super.reflectScrolledClipView(cView)
+        reportVisibleRange()
+    }
+
+    func reportVisibleRange(force: Bool = false) {
+        let minX = contentView.bounds.minX
+        let maxX = minX + contentView.bounds.width
+        let currentRange = minX...maxX
+
+        if !force, let lastRange = lastReportedVisibleRangeX,
+           abs(lastRange.lowerBound - currentRange.lowerBound) < 0.5,
+           abs(lastRange.upperBound - currentRange.upperBound) < 0.5 {
+            return
+        }
+
+        lastReportedVisibleRangeX = currentRange
+        onVisibleRangeChange?(currentRange)
     }
 
     override func scrollWheel(with event: NSEvent) {
         let horizontalDelta = abs(event.scrollingDeltaX)
         let verticalDelta = abs(event.scrollingDeltaY)
+        if horizontalDelta > 0.1 || verticalDelta > 0.1 {
+            onUserScrollIntervention?()
+        }
 
         if horizontalDelta < 0.1, verticalDelta > 0.1 {
             guard let documentView else {
