@@ -1,6 +1,8 @@
-# PasteHub
+# PasteHub-GuessWhoIam
 
 PasteHub 是一个 macOS 状态栏剪贴板工具：自动记录复制内容，通过浮动面板快速检索，并支持一键回填到原应用输入框。
+感谢原作者
+原仓库链接：https://github.com/lageev/PasteHub
 
 ![App截图](Images/screenshot-20260318-094525.png)
 
